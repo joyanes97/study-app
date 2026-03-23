@@ -102,7 +102,7 @@ def extract_pdf_text(pdf_path: Path) -> str:
         text=True,
         check=False,
     )
-    return result.stdout.strip()
+    return clean_extracted_text(result.stdout)
 
 
 def looks_like_real_text(text: str, min_chars: int) -> bool:
@@ -191,7 +191,7 @@ def image_to_data_url(image_path: Path) -> str:
 
 
 def text_to_markdown(text: str, title: str) -> str:
-    cleaned = re.sub(r"\n{3,}", "\n\n", text.strip())
+    cleaned = re.sub(r"\n{3,}", "\n\n", clean_extracted_text(text).strip())
     return f"# {title.strip()}\n\n{cleaned}".strip() + "\n"
 
 
@@ -231,3 +231,37 @@ def strip_code_fences(text: str) -> str:
         stripped = re.sub(r"^```[a-zA-Z0-9_-]*\n", "", stripped)
         stripped = re.sub(r"\n```$", "", stripped)
     return stripped
+
+
+def clean_extracted_text(text: str) -> str:
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        if should_drop_line(line):
+            continue
+        line = re.sub(r"\s{2,}", " ", line).strip()
+        if not line:
+            lines.append("")
+            continue
+        lines.append(line)
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def should_drop_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    patterns = [
+        r"www\.temarioopol\.com",
+        r"©\s*Autor:\s*Francisco\s+Javier\s+Bejarano\s+M\.?",
+        r"^\d+\s+Bloque\s+\d+.*$",
+        r"^Bloque\s+\d+\s+Legislaci[oó]n$",
+        r"^Polic[ií]a\s+Local\s+de\s+C[oó]rdoba\.?$",
+        r"^P[aá]g\.\s*\d+$",
+        r"^-{10,}$",
+    ]
+    return any(
+        re.search(pattern, stripped, flags=re.IGNORECASE) for pattern in patterns
+    )

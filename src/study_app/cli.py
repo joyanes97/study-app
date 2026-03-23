@@ -9,6 +9,10 @@ from study_app.markdown_loader import load_topics
 from study_app.nanobot import system_prompt
 from study_app.notebooklm import build_batch_script
 from study_app.pdf_ingest import ingest_pdf_inbox
+from study_app.practical_cases import (
+    build_practical_source_markdown,
+    generate_practical_cases,
+)
 from study_app.scheduler import build_daily_plan
 from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
@@ -111,6 +115,31 @@ def cmd_ingest_pdf(root: Path) -> int:
     return 0
 
 
+def cmd_generate_practicals(root: Path, source_pdf: str) -> int:
+    import subprocess
+
+    source = Path(source_pdf)
+    raw = subprocess.run(
+        ["pdftotext", "-layout", "-nopgbrk", str(source), "-"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    practical_dir = root / "data" / "content" / "practicals"
+    practical_dir.mkdir(parents=True, exist_ok=True)
+    source_md = practical_dir / "supuestos-practicos-base.md"
+    source_md.write_text(
+        "---\nsubject: practicos\ntopic: supuestos practicos\nsubtopic: base\npriority: high\nestimated_weight: 0.8\n---\n\n"
+        + build_practical_source_markdown(raw, "Supuestos prácticos"),
+        encoding="utf-8",
+    )
+    generated_md = practical_dir / "supuestos-practicos-generados.md"
+    generate_practical_cases(source_md.read_text(encoding="utf-8"), generated_md)
+    print(f"Base practicals: {source_md}")
+    print(f"Generated practicals: {generated_md}")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -133,6 +162,8 @@ def main() -> int:
     subparsers.add_parser("progress")
     subparsers.add_parser("notebooklm-auth")
     subparsers.add_parser("ingest-pdf")
+    practicals_parser = subparsers.add_parser("generate-practicals")
+    practicals_parser.add_argument("--source-pdf", required=True)
 
     serve_parser = subparsers.add_parser("serve")
     serve_parser.add_argument("--host", default="0.0.0.0")
@@ -157,6 +188,8 @@ def main() -> int:
         return cmd_notebooklm_auth(root)
     if args.command == "ingest-pdf":
         return cmd_ingest_pdf(root)
+    if args.command == "generate-practicals":
+        return cmd_generate_practicals(root, args.source_pdf)
     if args.command == "serve":
         return cmd_serve(args.host, args.port)
     parser.error("Unknown command")
