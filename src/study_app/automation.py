@@ -35,6 +35,7 @@ async def _generate_with_notebooklm(
     root: Path, changed_topics: list, state_dir: Path
 ) -> tuple[list[str], list[str]]:
     from notebooklm import NotebookLMClient  # type: ignore[import-not-found]
+    from notebooklm.types import QuizDifficulty, QuizQuantity  # type: ignore[import-not-found]
 
     generated_topics: list[str] = []
     pending_auth_topics: list[str] = []
@@ -61,8 +62,8 @@ async def _generate_with_notebooklm(
                 )
                 flashcards = await client.artifacts.generate_flashcards(
                     notebook.id,
-                    difficulty="medium",
-                    quantity="more",
+                    difficulty=QuizDifficulty.MEDIUM,
+                    quantity=QuizQuantity.MORE,
                 )
                 await client.artifacts.wait_for_completion(
                     notebook.id, flashcards.task_id
@@ -74,8 +75,8 @@ async def _generate_with_notebooklm(
                 )
                 quiz = await client.artifacts.generate_quiz(
                     notebook.id,
-                    difficulty="hard",
-                    quantity="standard",
+                    difficulty=QuizDifficulty.HARD,
+                    quantity=QuizQuantity.STANDARD,
                 )
                 await client.artifacts.wait_for_completion(notebook.id, quiz.task_id)
                 await client.artifacts.download_quiz(
