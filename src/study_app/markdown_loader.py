@@ -39,6 +39,8 @@ def load_topics(
             continue
         text = path.read_text(encoding="utf-8")
         meta, body = parse_frontmatter(text)
+        if meta.get("study_enabled", "true").lower() == "false":
+            continue
         fallback = path.stem.replace("-", " ").replace("_", " ").strip().title()
         title = title_from_body(body, fallback)
         rel_parts = path.relative_to(content_dir).parts

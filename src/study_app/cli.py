@@ -129,12 +129,20 @@ def cmd_generate_practicals(root: Path, source_pdf: str) -> int:
     practical_dir.mkdir(parents=True, exist_ok=True)
     source_md = practical_dir / "supuestos-practicos-base.md"
     source_md.write_text(
-        "---\nsubject: practicos\ntopic: supuestos practicos\nsubtopic: base\npriority: high\nestimated_weight: 0.8\n---\n\n"
+        "---\nsubject: practicos\ntopic: supuestos practicos\nsubtopic: base\npriority: high\nestimated_weight: 0.8\nstudy_enabled: false\n---\n\n"
         + build_practical_source_markdown(raw, "Supuestos prácticos"),
         encoding="utf-8",
     )
     generated_md = practical_dir / "supuestos-practicos-generados.md"
-    generate_practical_cases(source_md.read_text(encoding="utf-8"), generated_md)
+    generated = generate_practical_cases(
+        source_md.read_text(encoding="utf-8"), generated_md
+    )
+    body = generated.read_text(encoding="utf-8")
+    generated.write_text(
+        "---\nsubject: practicos\ntopic: supuestos practicos\nsubtopic: generados\npriority: high\nestimated_weight: 1.0\n---\n\n"
+        + body.lstrip(),
+        encoding="utf-8",
+    )
     print(f"Base practicals: {source_md}")
     print(f"Generated practicals: {generated_md}")
     return 0

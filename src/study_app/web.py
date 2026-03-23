@@ -17,6 +17,7 @@ from study_app.service import (
     next_card,
     next_question,
     progress_summary,
+    update_exam_date,
 )
 from study_app.study_store import record_card_review, record_question_attempt
 
@@ -44,6 +45,13 @@ def dashboard(request: Request, day: str | None = Query(default=None)):
             "data": data,
         },
     )
+
+
+@app.post("/settings/exam-date")
+def set_exam_date(exam_date: str = Form(...)):
+    new_date = date.fromisoformat(exam_date)
+    update_exam_date(ROOT, new_date)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/topics", response_class=HTMLResponse)

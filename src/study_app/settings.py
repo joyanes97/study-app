@@ -58,3 +58,13 @@ def load_settings(root: Path) -> Settings:
             "review_ratio", {"build": 0.5, "consolidate": 0.6, "final": 0.7}
         ),
     )
+
+
+def save_exam_date(root: Path, exam_date: date) -> Path:
+    config_path = root / "config" / "exam_config.json"
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    data["exam_date"] = exam_date.isoformat()
+    config_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return config_path

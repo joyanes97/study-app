@@ -18,7 +18,7 @@ def generate_practical_cases(source_markdown: str, output_path: Path) -> Path:
 
 
 def build_prompt(source_markdown: str) -> str:
-    sample = clean_extracted_text(source_markdown)[:28000]
+    sample = clean_extracted_text(source_markdown)[:14000]
     return (
         "Genera 12 supuestos prácticos nuevos para Policía Local de Jaén, en español, "
         "basados en el estilo del material de referencia. Cada supuesto debe incluir: "
@@ -47,10 +47,10 @@ def call_local_qwen(prompt: str) -> str:
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.5,
-        "max_tokens": 8192,
+        "max_tokens": 4096,
     }
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-    with httpx.Client(timeout=300) as client:
+    with httpx.Client(timeout=600) as client:
         response = client.post(
             f"{api_base}/chat/completions", json=payload, headers=headers
         )

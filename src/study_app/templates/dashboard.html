@@ -5,6 +5,11 @@
     <p class="eyebrow">Plan de hoy</p>
     <h1>Tu estudio se ajusta automaticamente al examen</h1>
     <p class="lead">Reparte el tiempo entre repaso, temas debiles, contenido nuevo y quiz mixto.</p>
+    <form class="exam-date-form" method="post" action="/settings/exam-date">
+      <label for="exam_date">Fecha del examen</label>
+      <input id="exam_date" name="exam_date" type="date" value="{{ data.exam_date }}" required>
+      <button type="submit">Actualizar</button>
+    </form>
   </div>
   <div class="stats-grid">
     <article class="stat-card accent">
@@ -22,6 +27,10 @@
     <article class="stat-card">
       <span>Material listo</span>
       <strong>{{ data.card_count }} / {{ data.question_count }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Sesion dinamica</span>
+      <strong>{{ data.session_targets.cards }} tarjetas / {{ data.session_targets.questions }} test</strong>
     </article>
   </div>
 </section>
@@ -86,7 +95,7 @@
       <li><a href="/study/quiz">Hacer test</a></li>
       <li><a href="/progress">Ver progreso y automatizacion</a></li>
     </ul>
-    <p class="note">Nanobot revisa material nuevo y recordatorios desde la automatizacion del sistema.</p>
+    <p class="note">Nanobot revisa material nuevo y recordatorios. La cantidad diaria cambia segun fecha del examen, retencion y tests disponibles.</p>
   </article>
 
   <article class="panel">

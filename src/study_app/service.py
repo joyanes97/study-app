@@ -5,7 +5,7 @@ from pathlib import Path
 
 from study_app.markdown_loader import load_topics
 from study_app.scheduler import build_daily_plan, score_topic
-from study_app.settings import load_settings
+from study_app.settings import load_settings, save_exam_date
 from study_app.state import load_progress
 from study_app.study_store import (
     ensure_daily_session,
@@ -86,8 +86,15 @@ def build_dashboard_data(
             }
         )
     topic_rows.sort(key=lambda item: item["score"], reverse=True)
-    today_cards = select_cards_for_today(plan, cards, card_reviews)
-    today_questions = select_questions_for_today(plan, questions, question_attempts)
+    session_targets = calculate_session_targets(
+        plan.days_left, plan.phase, len(cards), len(questions)
+    )
+    today_cards = select_cards_for_today(
+        plan, cards, card_reviews, session_targets["cards"]
+    )
+    today_questions = select_questions_for_today(
+        plan, questions, question_attempts, session_targets["questions"]
+    )
     daily_session = ensure_daily_session(
         root / "data" / "state", plan_date, today_cards, today_questions
     )
@@ -111,6 +118,7 @@ def build_dashboard_data(
         ],
         "today_cards": today_cards,
         "today_questions": today_questions,
+        "session_targets": session_targets,
         "daily_session": daily_session,
         "automation_report": automation_report,
     }
@@ -151,14 +159,43 @@ def find_topic(topic_id: str, root: Path | None = None):
     return None
 
 
-def select_cards_for_today(plan, cards: list[dict], card_reviews: dict) -> list[dict]:
+def calculate_session_targets(
+    days_left: int, phase: str, card_pool: int, question_pool: int
+) -> dict:
+    if phase == "build":
+        cards_target = 18
+        questions_target = 8
+    elif phase == "consolidate":
+        cards_target = 14
+        questions_target = 12
+    else:
+        cards_target = 10 if days_left <= 7 else 12
+        questions_target = 16 if days_left <= 7 else 14
+
+    cards_target = min(cards_target, card_pool)
+    questions_target = min(questions_target, question_pool)
+
+    if card_pool and cards_target == 0:
+        cards_target = min(6, card_pool)
+    if question_pool and questions_target == 0:
+        questions_target = min(6, question_pool)
+
+    return {
+        "cards": cards_target,
+        "questions": questions_target,
+    }
+
+
+def select_cards_for_today(
+    plan, cards: list[dict], card_reviews: dict, target_count: int
+) -> list[dict]:
     topic_ids = {
         item.topic.id
         for item in (plan.review_topics + plan.weak_topics + plan.new_topics)
     }
     selected = [card for card in cards if card["topic_id"] in topic_ids]
     selected.sort(key=lambda card: _card_sort_key(card, card_reviews))
-    return selected[:12]
+    return selected[:target_count]
 
 
 def _card_sort_key(card: dict, card_reviews: dict) -> tuple[int, str]:
@@ -169,12 +206,12 @@ def _card_sort_key(card: dict, card_reviews: dict) -> tuple[int, str]:
 
 
 def select_questions_for_today(
-    plan, questions: list[dict], attempts: dict
+    plan, questions: list[dict], attempts: dict, target_count: int
 ) -> list[dict]:
     topic_ids = {item.topic.id for item in (plan.weak_topics + plan.mixed_quiz_topics)}
     selected = [question for question in questions if question["topic_id"] in topic_ids]
     selected.sort(key=lambda question: _question_sort_key(question, attempts))
-    return selected[:10]
+    return selected[:target_count]
 
 
 def _question_sort_key(question: dict, attempts: dict) -> tuple[int, int]:
@@ -228,3 +265,8 @@ def progress_summary(root: Path | None = None) -> dict:
         "sessions": sessions,
         "automation_report": data["automation_report"],
     }
+
+
+def update_exam_date(root: Path | None, new_exam_date: date) -> Path:
+    root = root or get_root()
+    return save_exam_date(root, new_exam_date)
