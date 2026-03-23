@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} · Exam Study App</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="/">Exam Study App</a>
+      <span class="tag">plan diario por fecha de examen</span>
+    </div>
+    <nav class="nav">
+      <a href="/">Hoy</a>
+      <a href="/topics">Temas</a>
+      <a href="/api/plan">API</a>
+    </nav>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

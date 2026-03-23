@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Plan de hoy</p>
+    <h1>Tu estudio se ajusta automaticamente al examen</h1>
+    <p class="lead">Reparte el tiempo entre repaso, temas debiles, contenido nuevo y quiz mixto.</p>
+  </div>
+  <div class="stats-grid">
+    <article class="stat-card accent">
+      <span>Dias restantes</span>
+      <strong>{{ data.days_left }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Fase actual</span>
+      <strong>{{ data.phase }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Temas cargados</span>
+      <strong>{{ data.topic_count }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Fecha examen</span>
+      <strong>{{ data.exam_date }}</strong>
+    </article>
+  </div>
+</section>
+
+<section class="content-grid">
+  <article class="panel panel-wide">
+    <div class="panel-head">
+      <h2>Sesión recomendada de hoy</h2>
+      <span class="pill">{{ data.plan_date }}</span>
+    </div>
+    <div class="plan-columns">
+      <div>
+        <h3>Repaso</h3>
+        <ul class="item-list">
+          {% for topic in data.review_topics %}
+          <li><a href="/topics/{{ topic.id }}">{{ topic.title }}</a><span>riesgo {{ topic.forgetting_risk }}</span></li>
+          {% else %}
+          <li class="empty">Sin repaso urgente hoy</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Temas débiles</h3>
+        <ul class="item-list">
+          {% for topic in data.weak_topics %}
+          <li><a href="/topics/{{ topic.id }}">{{ topic.title }}</a><span>dominio {{ topic.mastery }}</span></li>
+          {% else %}
+          <li class="empty">No hay temas debiles detectados</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Contenido nuevo</h3>
+        <ul class="item-list">
+          {% for topic in data.new_topics %}
+          <li><a href="/topics/{{ topic.id }}">{{ topic.title }}</a><span>sin tarjetas</span></li>
+          {% else %}
+          <li class="empty">Todo el contenido ya tiene material base</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Quiz mixto</h3>
+        <ul class="item-list">
+          {% for topic in data.mixed_quiz_topics %}
+          <li><a href="/topics/{{ topic.id }}">{{ topic.title }}</a><span>score {{ topic.score }}</span></li>
+          {% else %}
+          <li class="empty">Sin quiz sugerido</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <h2>Acciones rápidas</h2>
+    </div>
+    <ul class="action-list">
+      <li><code>study-app plan --date today</code></li>
+      <li><code>study-app notebooklm-batch</code></li>
+      <li><code>/home/jose/exam-study-app/scripts/run_daily_cycle.sh</code></li>
+      <li><code>nanobot agent -c /home/jose/.nanobot-study/config.json</code></li>
+    </ul>
+    <p class="note">El batch de NotebookLM se genera en <code>/home/jose/exam-study-app/data/state/notebooklm-batch.sh</code>.</p>
+  </article>
+
+  <article class="panel panel-wide">
+    <div class="panel-head">
+      <h2>Temas más prioritarios</h2>
+      <a href="/topics">Ver todos</a>
+    </div>
+    <div class="topic-table-wrap">
+      <table class="topic-table">
+        <thead>
+          <tr>
+            <th>Tema</th>
+            <th>Prioridad</th>
+            <th>Peso</th>
+            <th>Dominio</th>
+            <th>Riesgo</th>
+            <th>Tarjetas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for topic in data.topics[:8] %}
+          <tr>
+            <td><a href="/topics/{{ topic.id }}">{{ topic.title }}</a></td>
+            <td>{{ topic.priority }}</td>
+            <td>{{ '%.2f'|format(topic.estimated_weight) }}</td>
+            <td>{{ '%.2f'|format(topic.mastery) }}</td>
+            <td>{{ '%.2f'|format(topic.forgetting_risk) }}</td>
+            <td>{{ topic.generated_cards }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exam-study-app"
+version = "0.2.0"
+description = "Daily study planner for Markdown notes with a global exam date"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "jinja2>=3.1.0",
+  "markdown>=3.6"
+]
+
+[project.scripts]
+study-app = "study_app.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+study_app = ["templates/*.html", "static/*"]

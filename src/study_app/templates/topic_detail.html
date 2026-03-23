@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="topic-detail-header">
+  <div>
+    <p class="eyebrow">Tema</p>
+    <h1>{{ topic.title }}</h1>
+    <p class="lead">{{ topic.subject }} · {{ topic.topic }} · {{ topic.subtopic }}</p>
+  </div>
+  <div class="stats-grid compact">
+    <article class="stat-card"><span>Prioridad</span><strong>{{ topic.priority }}</strong></article>
+    <article class="stat-card"><span>Peso</span><strong>{{ '%.2f'|format(topic.estimated_weight) }}</strong></article>
+    <article class="stat-card"><span>Dominio</span><strong>{{ '%.2f'|format(progress.mastery) }}</strong></article>
+    <article class="stat-card"><span>Riesgo</span><strong>{{ '%.2f'|format(progress.forgetting_risk) }}</strong></article>
+  </div>
+</section>
+<section class="content-grid">
+  <article class="panel panel-wide markdown-body">{{ rendered_markdown|safe }}</article>
+  <aside class="panel">
+    <div class="panel-head"><h2>Ruta del archivo</h2></div>
+    <p><code>{{ topic.source_path }}</code></p>
+    <div class="panel-head"><h2>Material generado</h2></div>
+    <ul class="action-list">
+      <li>Tarjetas: {{ progress.generated_cards }}</li>
+      <li>Quiz items: {{ progress.generated_quiz_items }}</li>
+    </ul>
+    <p class="note">Cuando importes los JSON de NotebookLM, esta vista reflejara el material disponible.</p>
+  </aside>
+</section>
+{% endblock %}

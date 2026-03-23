@@ -1,0 +1,17 @@
+{
+  "exam_date": "2026-06-01",
+  "timezone": "Europe/Madrid",
+  "daily_new_cards_limit": 30,
+  "daily_quiz_limit": 20,
+  "phase_boundaries": {
+    "build_days": 60,
+    "consolidate_days": 21
+  },
+  "default_topic_weight": 0.5,
+  "default_priority": "medium",
+  "review_ratio": {
+    "build": 0.5,
+    "consolidate": 0.6,
+    "final": 0.7
+  }
+}

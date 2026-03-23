@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="list-header">
+  <div>
+    <p class="eyebrow">Biblioteca de estudio</p>
+    <h1>Todos tus temas</h1>
+  </div>
+  <p class="lead">Los temas se ordenan por urgencia estimada para el examen.</p>
+</section>
+<section class="topics-grid">
+  {% for topic in data.topics %}
+  <article class="topic-card">
+    <div class="topic-card-head">
+      <span class="badge">{{ topic.subject }}</span>
+      <span class="score">{{ '%.2f'|format(topic.score) }}</span>
+    </div>
+    <h2><a href="/topics/{{ topic.id }}">{{ topic.title }}</a></h2>
+    <p>{{ topic.topic }} · {{ topic.subtopic }}</p>
+    <dl>
+      <div><dt>Prioridad</dt><dd>{{ topic.priority }}</dd></div>
+      <div><dt>Dominio</dt><dd>{{ '%.2f'|format(topic.mastery) }}</dd></div>
+      <div><dt>Riesgo</dt><dd>{{ '%.2f'|format(topic.forgetting_risk) }}</dd></div>
+      <div><dt>Tarjetas</dt><dd>{{ topic.generated_cards }}</dd></div>
+    </dl>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}
