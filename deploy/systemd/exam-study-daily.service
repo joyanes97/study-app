@@ -1,0 +1,12 @@
+[Unit]
+Description=Exam Study App Daily Planner Cycle
+After=network.target
+
+[Service]
+Type=oneshot
+User=jose
+Group=jose
+WorkingDirectory=/home/jose/exam-study-app
+ExecStart=/bin/bash -lc '/home/jose/exam-study-app/scripts/run_daily_cycle.sh'
+StandardOutput=append:/home/jose/exam-study-app/logs/daily-cycle.log
+StandardError=append:/home/jose/exam-study-app/logs/daily-cycle.log

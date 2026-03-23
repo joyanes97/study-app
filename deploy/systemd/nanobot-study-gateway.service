@@ -1,0 +1,21 @@
+[Unit]
+Description=Nanobot Study Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/jose/exam-study-app
+ExecStart=/home/jose/exam-study-app/.venv/bin/nanobot gateway --config /home/jose/.nanobot-study/config.json
+Restart=always
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jose/.nanobot-study /home/jose/exam-study-app
+StandardOutput=append:/home/jose/exam-study-app/logs/nanobot-gateway.log
+StandardError=append:/home/jose/exam-study-app/logs/nanobot-gateway.log
+
+[Install]
+WantedBy=default.target

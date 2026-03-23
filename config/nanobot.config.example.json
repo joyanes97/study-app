@@ -1,0 +1,24 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/home/jose/exam-study-app",
+      "provider": "zhipu",
+      "model": "glm-4.5"
+    }
+  },
+  "providers": {
+    "zhipu": {
+      "apiKey": "${ZHIPU_API_KEY}",
+      "apiBase": "https://open.bigmodel.cn/api/paas/v4"
+    }
+  },
+  "gateway": {
+    "port": 18791
+  },
+  "tools": {
+    "restrictToWorkspace": true,
+    "exec": {
+      "enable": false
+    }
+  }
+}

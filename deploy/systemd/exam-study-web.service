@@ -1,0 +1,22 @@
+[Unit]
+Description=Exam Study App Web UI
+After=network.target
+
+[Service]
+Type=simple
+User=jose
+Group=jose
+WorkingDirectory=/home/jose/exam-study-app
+ExecStart=/home/jose/exam-study-app/.venv/bin/study-app serve --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/jose/exam-study-app
+StandardOutput=append:/home/jose/exam-study-app/logs/web-service.log
+StandardError=append:/home/jose/exam-study-app/logs/web-service.log
+
+[Install]
+WantedBy=multi-user.target

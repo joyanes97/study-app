@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Exam Study App Daily Planner every morning
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+Unit=exam-study-daily.service
+
+[Install]
+WantedBy=timers.target
