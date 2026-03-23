@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="list-header">
+  <div>
+    <p class="eyebrow">Progreso</p>
+    <h1>Estado real del estudio y de la automatizacion</h1>
+  </div>
+  <p class="lead">Aqui ves si el dia esta completo y si Nanobot detecto material nuevo o tareas pendientes.</p>
+</section>
+
+<section class="content-grid">
+  <article class="panel">
+    <div class="panel-head"><h2>Sesion diaria</h2></div>
+    <ul class="action-list">
+      <li>Estado: {{ data.daily_session.status }}</li>
+      <li>Tarjetas: {{ data.daily_session.completed_cards|length }}/{{ data.daily_session.target_cards }}</li>
+      <li>Preguntas: {{ data.daily_session.completed_questions|length }}/{{ data.daily_session.target_questions }}</li>
+    </ul>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head"><h2>Automatizacion</h2></div>
+    <ul class="action-list">
+      <li>Ultima ejecucion: {{ data.automation_report.last_run or 'sin ejecutar' }}</li>
+      <li>Necesita recordatorio: {{ 'si' if data.automation_report.needs_reminder else 'no' }}</li>
+      <li>Resumen: {{ data.automation_report.summary }}</li>
+    </ul>
+  </article>
+
+  <article class="panel panel-wide">
+    <div class="panel-head"><h2>Temas ordenados por urgencia</h2></div>
+    <div class="topic-table-wrap">
+      <table class="topic-table">
+        <thead>
+          <tr>
+            <th>Tema</th>
+            <th>Dominio</th>
+            <th>Riesgo</th>
+            <th>Tarjetas</th>
+            <th>Preguntas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for topic in data.topics[:12] %}
+          <tr>
+            <td>{{ topic.title }}</td>
+            <td>{{ '%.2f'|format(topic.mastery) }}</td>
+            <td>{{ '%.2f'|format(topic.forgetting_risk) }}</td>
+            <td>{{ topic.generated_cards }}</td>
+            <td>{{ topic.generated_quiz_items }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+{% endblock %}

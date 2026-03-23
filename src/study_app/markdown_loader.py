@@ -30,16 +30,24 @@ def title_from_body(body: str, fallback: str) -> str:
     return match.group(1).strip() if match else fallback
 
 
-def load_topics(content_dir: Path, default_priority: str, default_weight: float) -> list[Topic]:
+def load_topics(
+    content_dir: Path, default_priority: str, default_weight: float
+) -> list[Topic]:
     topics: list[Topic] = []
     for path in sorted(content_dir.rglob("*.md")):
+        if path.name.startswith("._"):
+            continue
         text = path.read_text(encoding="utf-8")
         meta, body = parse_frontmatter(text)
         fallback = path.stem.replace("-", " ").replace("_", " ").strip().title()
         title = title_from_body(body, fallback)
         rel_parts = path.relative_to(content_dir).parts
-        subject = meta.get("subject") or (rel_parts[0] if len(rel_parts) > 1 else "general")
-        topic_name = meta.get("topic") or (rel_parts[-2] if len(rel_parts) > 1 else path.stem)
+        subject = meta.get("subject") or (
+            rel_parts[0] if len(rel_parts) > 1 else "general"
+        )
+        topic_name = meta.get("topic") or (
+            rel_parts[-2] if len(rel_parts) > 1 else path.stem
+        )
         subtopic = meta.get("subtopic") or path.stem
         digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
         topics.append(

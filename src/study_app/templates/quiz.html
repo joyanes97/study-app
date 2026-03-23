@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="list-header">
+  <div>
+    <p class="eyebrow">Modo test</p>
+    <h1>Practica solo con preguntas optimizadas</h1>
+  </div>
+  <p class="lead">El feedback inmediato corrige errores y mueve el siguiente repaso.</p>
+</section>
+
+{% if feedback %}
+<article class="panel panel-wide feedback-panel {{ 'success' if feedback.is_correct else 'warning' }}">
+  <div class="panel-head"><h2>{{ 'Correcta' if feedback.is_correct else 'Incorrecta' }}</h2></div>
+  <p>{{ feedback.question.question }}</p>
+  <p><strong>Respuesta correcta:</strong> {{ feedback.correct_option.text if feedback.correct_option else 'No disponible' }}</p>
+  {% if feedback.question.hint %}<p><strong>Explicacion:</strong> {{ feedback.question.hint }}</p>{% endif %}
+</article>
+{% endif %}
+
+{% if question %}
+<article class="panel panel-wide quiz-panel">
+  <div class="panel-head">
+    <h2>{{ question.title }}</h2>
+    <span class="pill">{{ question.topic_id }}</span>
+  </div>
+  <p class="quiz-question">{{ question.question }}</p>
+  <form method="post" action="/study/quiz/{{ question.id }}/answer" class="quiz-form">
+    {% for option in question.options %}
+    <label class="quiz-option">
+      <input type="radio" name="option_id" value="{{ option.id }}" required>
+      <span>{{ option.text }}</span>
+    </label>
+    {% endfor %}
+    <button type="submit">Responder</button>
+  </form>
+</article>
+{% else %}
+<article class="panel"><p>No hay preguntas disponibles todavia. Genera e importa quiz desde NotebookLM.</p></article>
+{% endif %}
+{% endblock %}

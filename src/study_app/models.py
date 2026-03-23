@@ -12,7 +12,7 @@ PRIORITY_FACTORS = {
 }
 
 
-@dataclass(slots=True)
+@dataclass
 class Topic:
     id: str
     subject: str
@@ -25,7 +25,7 @@ class Topic:
     body: str
 
 
-@dataclass(slots=True)
+@dataclass
 class TopicProgress:
     topic_id: str
     mastery: float = 0.3
@@ -40,14 +40,14 @@ class TopicProgress:
         return max(0.2, 1.0 - self.mastery) + (self.incorrect_streak * 0.05)
 
 
-@dataclass(slots=True)
+@dataclass
 class TopicScore:
     topic: Topic
     progress: TopicProgress
     score: float
 
 
-@dataclass(slots=True)
+@dataclass
 class DailyPlan:
     plan_date: date
     exam_date: date

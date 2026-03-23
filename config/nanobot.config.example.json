@@ -15,10 +15,18 @@
   "gateway": {
     "port": 18791
   },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "TELEGRAM_BOT_TOKEN",
+      "allowFrom": ["YOUR_TELEGRAM_USER_ID"]
+    }
+  },
   "tools": {
     "restrictToWorkspace": true,
     "exec": {
-      "enable": false
+      "enable": true,
+      "pathAppend": "/home/jose/exam-study-app/.venv/bin"
     }
   }
 }

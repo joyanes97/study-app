@@ -7,6 +7,8 @@
     "build_days": 60,
     "consolidate_days": 21
   },
+  "reminder_hours": [14, 19, 22],
+  "automation_scan_minutes": 15,
   "default_topic_weight": 0.5,
   "default_priority": "medium",
   "review_ratio": {

@@ -7,5 +7,6 @@ ROOT="/home/jose/exam-study-app"
 study-app plan --date today
 study-app notebooklm-batch
 study-app nanobot-config
+study-app automation-run
 
 echo "Daily cycle prepared in $ROOT/data/state"

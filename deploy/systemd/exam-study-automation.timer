@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Exam Study App automation every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=exam-study-automation.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="list-header">
+  <div>
+    <p class="eyebrow">Modo tarjetas</p>
+    <h1>Repasa solo con tarjetas generadas por la app</h1>
+  </div>
+  <p class="lead">Cada respuesta ajusta el plan diario y el riesgo de olvido.</p>
+</section>
+
+{% if card %}
+<section class="content-grid">
+  <article class="panel panel-wide study-card">
+    <div class="panel-head">
+      <h2>{{ card.title }}</h2>
+      <span class="pill">{{ card.topic_id }}</span>
+    </div>
+    <div class="flashcard-face">
+      <h3>Pregunta</h3>
+      <p>{{ card.front }}</p>
+    </div>
+    <details class="flashcard-answer">
+      <summary>Mostrar respuesta</summary>
+      <p>{{ card.back }}</p>
+    </details>
+    <form method="post" action="/study/cards/{{ card.id }}/review" class="review-form">
+      <button type="submit" name="rating" value="again" class="danger">No la sabia</button>
+      <button type="submit" name="rating" value="hard">Dudosa</button>
+      <button type="submit" name="rating" value="good">Bien</button>
+      <button type="submit" name="rating" value="easy">Muy facil</button>
+    </form>
+  </article>
+
+  <aside class="panel">
+    <div class="panel-head"><h2>Hoy</h2></div>
+    <ul class="action-list">
+      <li>Tarjetas objetivo: {{ data.daily_session.target_cards }}</li>
+      <li>Tarjetas completadas: {{ data.daily_session.completed_cards|length }}</li>
+      <li>Estado: {{ data.daily_session.status }}</li>
+    </ul>
+  </aside>
+</section>
+{% else %}
+<article class="panel"><p>No hay tarjetas disponibles todavia. Importa material generado desde NotebookLM.</p></article>
+{% endif %}
+{% endblock %}

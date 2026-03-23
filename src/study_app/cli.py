@@ -4,10 +4,12 @@ import argparse
 from datetime import date
 from pathlib import Path
 
+from study_app.automation import notebooklm_storage_path, run_automation
 from study_app.markdown_loader import load_topics
 from study_app.nanobot import system_prompt
 from study_app.notebooklm import build_batch_script
 from study_app.scheduler import build_daily_plan
+from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
 from study_app.state import load_progress
 
@@ -22,7 +24,11 @@ def resolve_date(raw: str) -> date:
 
 def build_context(root: Path):
     settings = load_settings(root)
-    topics = load_topics(root / "data" / "content", settings.default_priority, settings.default_topic_weight)
+    topics = load_topics(
+        root / "data" / "content",
+        settings.default_priority,
+        settings.default_topic_weight,
+    )
     progress = load_progress(root / "data" / "state", topics)
     return settings, topics, progress
 
@@ -71,6 +77,31 @@ def cmd_nanobot_config(root: Path) -> int:
     return 0
 
 
+def cmd_automation(root: Path) -> int:
+    report = run_automation(root)
+    print(report["summary"])
+    return 0
+
+
+def cmd_progress(root: Path) -> int:
+    data = progress_summary(root)
+    daily = data["daily_session"]
+    print(f"Session: {daily['status']}")
+    print(
+        f"Cards {len(daily['completed_cards'])}/{daily['target_cards']} | "
+        f"Questions {len(daily['completed_questions'])}/{daily['target_questions']}"
+    )
+    print(data["automation_report"]["summary"])
+    return 0
+
+
+def cmd_notebooklm_auth(root: Path) -> int:
+    storage = notebooklm_storage_path(root)
+    print(f"NotebookLM storage: {storage}")
+    print("ready" if storage.exists() else "missing")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -89,6 +120,9 @@ def main() -> int:
 
     subparsers.add_parser("notebooklm-batch")
     subparsers.add_parser("nanobot-config")
+    subparsers.add_parser("automation-run")
+    subparsers.add_parser("progress")
+    subparsers.add_parser("notebooklm-auth")
 
     serve_parser = subparsers.add_parser("serve")
     serve_parser.add_argument("--host", default="0.0.0.0")
@@ -105,6 +139,12 @@ def main() -> int:
         return cmd_notebooklm_batch(root)
     if args.command == "nanobot-config":
         return cmd_nanobot_config(root)
+    if args.command == "automation-run":
+        return cmd_automation(root)
+    if args.command == "progress":
+        return cmd_progress(root)
+    if args.command == "notebooklm-auth":
+        return cmd_notebooklm_auth(root)
     if args.command == "serve":
         return cmd_serve(args.host, args.port)
     parser.error("Unknown command")

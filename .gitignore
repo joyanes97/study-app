@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 *.log
 .DS_Store
+._*
 
 src/*.egg-info/
 src/**/*.egg-info/

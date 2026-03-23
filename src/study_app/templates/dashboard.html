@@ -20,8 +20,8 @@
       <strong>{{ data.topic_count }}</strong>
     </article>
     <article class="stat-card">
-      <span>Fecha examen</span>
-      <strong>{{ data.exam_date }}</strong>
+      <span>Material listo</span>
+      <strong>{{ data.card_count }} / {{ data.question_count }}</strong>
     </article>
   </div>
 </section>
@@ -78,15 +78,26 @@
 
   <article class="panel">
     <div class="panel-head">
-      <h2>Acciones rápidas</h2>
+      <h2>Estudiar desde la app</h2>
     </div>
     <ul class="action-list">
-      <li><code>study-app plan --date today</code></li>
-      <li><code>study-app notebooklm-batch</code></li>
-      <li><code>/home/jose/exam-study-app/scripts/run_daily_cycle.sh</code></li>
-      <li><code>nanobot agent -c /home/jose/.nanobot-study/config.json</code></li>
+      <li><a href="/study/session">Abrir sesion diaria</a></li>
+      <li><a href="/study/cards">Repasar tarjetas</a></li>
+      <li><a href="/study/quiz">Hacer test</a></li>
+      <li><a href="/progress">Ver progreso y automatizacion</a></li>
     </ul>
-    <p class="note">El batch de NotebookLM se genera en <code>/home/jose/exam-study-app/data/state/notebooklm-batch.sh</code>.</p>
+    <p class="note">Nanobot revisa material nuevo y recordatorios desde la automatizacion del sistema.</p>
+  </article>
+
+  <article class="panel">
+    <div class="panel-head">
+      <h2>Automatizacion</h2>
+    </div>
+    <ul class="action-list">
+      <li>Ultima ejecucion: {{ data.automation_report.last_run or 'pendiente' }}</li>
+      <li>Necesita recordatorio: {{ 'si' if data.automation_report.needs_reminder else 'no' }}</li>
+      <li>{{ data.automation_report.summary }}</li>
+    </ul>
   </article>
 
   <article class="panel panel-wide">

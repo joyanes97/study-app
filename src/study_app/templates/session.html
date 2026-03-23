@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Sesion del dia</p>
+    <h1>La app decide que estudiar y en que formato</h1>
+    <p class="lead">No necesitas abrir apuntes. Entra, responde, corrige y deja que el sistema reprograme el resto.</p>
+  </div>
+  <div class="stats-grid">
+    <article class="stat-card accent"><span>Tarjetas</span><strong>{{ data.daily_session.target_cards }}</strong></article>
+    <article class="stat-card"><span>Preguntas</span><strong>{{ data.daily_session.target_questions }}</strong></article>
+    <article class="stat-card"><span>Completadas</span><strong>{{ data.daily_session.completed_cards|length + data.daily_session.completed_questions|length }}</strong></article>
+    <article class="stat-card"><span>Estado</span><strong>{{ data.daily_session.status }}</strong></article>
+  </div>
+</section>
+
+<section class="topics-grid">
+  <a class="topic-card cta-card" href="/study/cards">
+    <div class="topic-card-head"><span class="badge">Tarjetas</span></div>
+    <h2>Repasar tarjetas</h2>
+    <p>Empieza con memoria activa y espaciada.</p>
+  </a>
+  <a class="topic-card cta-card" href="/study/quiz">
+    <div class="topic-card-head"><span class="badge">Test</span></div>
+    <h2>Hacer test</h2>
+    <p>Practica preguntas con feedback inmediato.</p>
+  </a>
+  <a class="topic-card cta-card" href="/progress">
+    <div class="topic-card-head"><span class="badge">Progreso</span></div>
+    <h2>Ver progreso</h2>
+    <p>Comprueba si te falta material o estudio diario.</p>
+  </a>
+</section>
+{% endblock %}
