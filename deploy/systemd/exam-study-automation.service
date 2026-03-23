@@ -7,6 +7,7 @@ Type=oneshot
 User=jose
 Group=jose
 WorkingDirectory=/home/jose/exam-study-app
+EnvironmentFile=/home/jose/.config/exam-study-app/env
 ExecStart=/bin/bash -lc '/home/jose/exam-study-app/scripts/run_automation.sh'
 StandardOutput=append:/home/jose/exam-study-app/logs/automation.log
 StandardError=append:/home/jose/exam-study-app/logs/automation.log

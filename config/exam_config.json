@@ -9,6 +9,12 @@
   },
   "reminder_hours": [14, 19, 22],
   "automation_scan_minutes": 15,
+  "telegram_media_dir": "/home/jose/.nanobot-study/media/telegram",
+  "pdf_inbox_dir": "/home/jose/exam-study-app/data/content/inbox",
+  "pdf_text_min_chars": 800,
+  "pdf_max_pages": 20,
+  "glm_ocr_api_base": "http://192.168.3.25:8081/v1",
+  "glm_ocr_model": "glm-ocr",
   "default_topic_weight": 0.5,
   "default_priority": "medium",
   "review_ratio": {

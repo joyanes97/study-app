@@ -82,7 +82,9 @@ def load_automation_report(state_dir: Path) -> dict:
         {
             "generated_topics": [],
             "pending_auth_topics": [],
+            "pending_ocr_topics": [],
             "new_material_topics": [],
+            "ingested_pdfs": [],
             "daily_session": {},
             "needs_reminder": False,
             "last_run": None,
@@ -93,6 +95,14 @@ def load_automation_report(state_dir: Path) -> dict:
 
 def save_automation_report(state_dir: Path, payload: dict) -> Path:
     return write_json(_path(state_dir, "automation_report.json"), payload)
+
+
+def load_pdf_ingest_index(state_dir: Path) -> dict:
+    return read_json(_path(state_dir, "pdf_ingest_index.json"), {})
+
+
+def save_pdf_ingest_index(state_dir: Path, payload: dict) -> Path:
+    return write_json(_path(state_dir, "pdf_ingest_index.json"), payload)
 
 
 def topic_source_hash(topic: Topic) -> str:

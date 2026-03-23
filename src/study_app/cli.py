@@ -8,6 +8,7 @@ from study_app.automation import notebooklm_storage_path, run_automation
 from study_app.markdown_loader import load_topics
 from study_app.nanobot import system_prompt
 from study_app.notebooklm import build_batch_script
+from study_app.pdf_ingest import ingest_pdf_inbox
 from study_app.scheduler import build_daily_plan
 from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
@@ -102,6 +103,14 @@ def cmd_notebooklm_auth(root: Path) -> int:
     return 0
 
 
+def cmd_ingest_pdf(root: Path) -> int:
+    settings = load_settings(root)
+    report = ingest_pdf_inbox(root, settings, root / "data" / "state")
+    print(f"Ingested PDFs: {len(report['ingested'])}")
+    print(f"Pending OCR: {len(report['pending_ocr'])}")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -123,6 +132,7 @@ def main() -> int:
     subparsers.add_parser("automation-run")
     subparsers.add_parser("progress")
     subparsers.add_parser("notebooklm-auth")
+    subparsers.add_parser("ingest-pdf")
 
     serve_parser = subparsers.add_parser("serve")
     serve_parser.add_argument("--host", default="0.0.0.0")
@@ -145,6 +155,8 @@ def main() -> int:
         return cmd_progress(root)
     if args.command == "notebooklm-auth":
         return cmd_notebooklm_auth(root)
+    if args.command == "ingest-pdf":
+        return cmd_ingest_pdf(root)
     if args.command == "serve":
         return cmd_serve(args.host, args.port)
     parser.error("Unknown command")

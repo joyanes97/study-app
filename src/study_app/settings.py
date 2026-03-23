@@ -17,6 +17,12 @@ class Settings:
     consolidate_days: int
     reminder_hours: list[int]
     automation_scan_minutes: int
+    telegram_media_dir: str
+    pdf_inbox_dir: str
+    pdf_text_min_chars: int
+    pdf_max_pages: int
+    glm_ocr_api_base: str
+    glm_ocr_model: str
     default_topic_weight: float
     default_priority: str
     review_ratio: dict[str, float]
@@ -36,6 +42,16 @@ def load_settings(root: Path) -> Settings:
         consolidate_days=int(phase_boundaries.get("consolidate_days", 21)),
         reminder_hours=[int(hour) for hour in data.get("reminder_hours", [14, 19, 22])],
         automation_scan_minutes=int(data.get("automation_scan_minutes", 15)),
+        telegram_media_dir=data.get(
+            "telegram_media_dir", "/home/jose/.nanobot-study/media/telegram"
+        ),
+        pdf_inbox_dir=data.get(
+            "pdf_inbox_dir", str(root / "data" / "content" / "inbox")
+        ),
+        pdf_text_min_chars=int(data.get("pdf_text_min_chars", 800)),
+        pdf_max_pages=int(data.get("pdf_max_pages", 20)),
+        glm_ocr_api_base=data.get("glm_ocr_api_base", "http://192.168.3.25:8081/v1"),
+        glm_ocr_model=data.get("glm_ocr_model", "glm-ocr"),
         default_topic_weight=float(data.get("default_topic_weight", 0.5)),
         default_priority=data.get("default_priority", "medium"),
         review_ratio=data.get(

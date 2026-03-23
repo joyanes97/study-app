@@ -8,6 +8,8 @@ Study planner for topic-based Markdown notes with one global exam date.
 - Web UI reachable at `http://192.168.3.29:8765`
 - Nanobot config stored in `/home/jose/.nanobot-study/config.json`
 - Nanobot user service stored in `/home/jose/.config/systemd/user/nanobot-study-gateway.service`
+- Telegram PDFs can be ingested from `/home/jose/.nanobot-study/media/telegram/`
+- OCR backend can use a separate GLM-OCR llama.cpp server on `192.168.3.25:8081`
 
 ## Main folders
 
@@ -39,6 +41,21 @@ study-app serve --host 0.0.0.0 --port 8765
 5. Open the UI in the browser and study from `/study/cards` and `/study/quiz`.
 6. Nanobot watches for new material and unfinished daily study via the automation loop and Telegram.
 
+## PDF ingestion
+
+- Send a PDF to the Telegram bot.
+- Nanobot stores the file under `/home/jose/.nanobot-study/media/telegram/`.
+- The automation loop tries `pdftotext` first.
+- If the PDF is scanned or low-text, the app renders pages and calls GLM-OCR.
+- The resulting Markdown is saved into `data/content/inbox/` and then enters the normal NotebookLM generation flow.
+
+Useful commands:
+
+```bash
+study-app ingest-pdf
+study-app automation-run
+```
+
 ## UI sections
 
 - `/`: dashboard with today's study plan
@@ -68,6 +85,7 @@ The server now runs these systemd units:
 - `exam-study-automation.timer`: runs the material scan and generation loop every 15 minutes
 - `exam-study-automation.service`: oneshot automation job
 - `nanobot-study-gateway.service`: Nanobot gateway as a hardened user service for `jose`
+- `local-llm-glm-ocr.service`: optional GLM-OCR llama.cpp service on the OCR host
 
 Useful commands:
 
@@ -91,6 +109,7 @@ Service templates tracked in this repo:
 - `deploy/systemd/exam-study-automation.service`
 - `deploy/systemd/exam-study-automation.timer`
 - `deploy/systemd/nanobot-study-gateway.service`
+- `deploy/systemd/local-llm-glm-ocr.service`
 
 NotebookLM connection requirement:
 

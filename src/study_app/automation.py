@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from study_app.markdown_loader import load_topics
+from study_app.pdf_ingest import ingest_pdf_inbox
 from study_app.json_store import write_json
 from study_app.settings import load_settings
 from study_app.state import load_progress, save_progress
@@ -94,12 +95,13 @@ async def _generate_with_notebooklm(
 
 def run_automation(root: Path) -> dict:
     settings = load_settings(root)
+    state_dir = root / "data" / "state"
+    pdf_report = ingest_pdf_inbox(root, settings, state_dir)
     topics = load_topics(
         root / "data" / "content",
         settings.default_priority,
         settings.default_topic_weight,
     )
-    state_dir = root / "data" / "state"
     generated_dir = root / "data" / "generated"
     generated_dir.mkdir(parents=True, exist_ok=True)
     progress = load_progress(state_dir, topics)
@@ -122,6 +124,7 @@ def run_automation(root: Path) -> dict:
 
     generated_topics: list[str] = []
     pending_auth_topics: list[str] = []
+    pending_ocr_topics = [item["source_pdf"] for item in pdf_report["pending_ocr"]]
     if changed_topics:
         for topic in changed_topics:
             generation_jobs.append(
@@ -186,11 +189,19 @@ def run_automation(root: Path) -> dict:
         summary_parts.append(
             f"Temas nuevos o modificados: {', '.join(topic.title for topic in changed_topics)}"
         )
+    if pdf_report["ingested"]:
+        summary_parts.append(
+            f"PDFs convertidos a Markdown: {len(pdf_report['ingested'])}"
+        )
     if generated_topics:
         summary_parts.append(f"Material generado para {len(generated_topics)} temas")
     if pending_auth_topics:
         summary_parts.append(
             "NotebookLM necesita autenticación para generar material nuevo"
+        )
+    if pending_ocr_topics:
+        summary_parts.append(
+            f"OCR pendiente o fallido en {len(pending_ocr_topics)} PDFs"
         )
     if needs_reminder:
         summary_parts.append(
@@ -203,7 +214,9 @@ def run_automation(root: Path) -> dict:
         {
             "generated_topics": generated_topics,
             "pending_auth_topics": pending_auth_topics,
+            "pending_ocr_topics": pending_ocr_topics,
             "new_material_topics": [topic.id for topic in changed_topics],
+            "ingested_pdfs": pdf_report["ingested"],
             "daily_session": {
                 "date": today_session["date"],
                 "status": today_session["status"],
