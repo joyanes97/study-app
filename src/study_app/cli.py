@@ -4,7 +4,14 @@ import argparse
 from datetime import date
 from pathlib import Path
 
-from study_app.automation import notebooklm_storage_path, run_automation
+from study_app.automation import (
+    mark_generation_notified,
+    mark_generation_running,
+    mark_reminder_sent,
+    notebooklm_storage_path,
+    run_automation,
+    set_reminder_suppression,
+)
 from study_app.markdown_loader import load_topics
 from study_app.nanobot import system_prompt
 from study_app.notebooklm import build_batch_script
@@ -17,6 +24,7 @@ from study_app.scheduler import build_daily_plan
 from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
 from study_app.state import load_progress
+from study_app.topic_splitter import split_block_markdown
 
 
 def resolve_root() -> Path:
@@ -107,6 +115,35 @@ def cmd_notebooklm_auth(root: Path) -> int:
     return 0
 
 
+def cmd_reminder_sent(root: Path, reminder_key: str) -> int:
+    state = mark_reminder_sent(root, reminder_key)
+    print(state["last_sent_key"])
+    return 0
+
+
+def cmd_suppress_reminders(root: Path, mode: str) -> int:
+    state = set_reminder_suppression(root, mode == "on")
+    print(f"suppress_reminders={state['suppress_reminders']}")
+    return 0
+
+
+def cmd_generation_notified(root: Path) -> int:
+    state = mark_generation_notified(root)
+    print(state["generation_complete_notified"])
+    return 0
+
+
+def cmd_generation_state(root: Path, mode: str, total: int, completed: int) -> int:
+    state = mark_generation_running(
+        root,
+        running=(mode == "start"),
+        total_topics=total,
+        completed_topics=completed,
+    )
+    print(state["generation_running"])
+    return 0
+
+
 def cmd_ingest_pdf(root: Path) -> int:
     settings = load_settings(root)
     report = ingest_pdf_inbox(root, settings, root / "data" / "state")
@@ -148,6 +185,16 @@ def cmd_generate_practicals(root: Path, source_pdf: str) -> int:
     return 0
 
 
+def cmd_split_topics(root: Path) -> int:
+    inbox_dir = root / "data" / "content" / "inbox"
+    output_dir = root / "data" / "content" / "topics"
+    written = []
+    for path in sorted(inbox_dir.glob("*.md")):
+        written.extend(split_block_markdown(path, output_dir))
+    print(f"Split topic files: {len(written)}")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -169,7 +216,19 @@ def main() -> int:
     subparsers.add_parser("automation-run")
     subparsers.add_parser("progress")
     subparsers.add_parser("notebooklm-auth")
+    reminder_parser = subparsers.add_parser("reminder-sent")
+    reminder_parser.add_argument("--key", required=True)
+    suppress_parser = subparsers.add_parser("suppress-reminders")
+    suppress_parser.add_argument("--mode", choices=["on", "off"], required=True)
+    subparsers.add_parser("generation-notified")
+    generation_state_parser = subparsers.add_parser("generation-state")
+    generation_state_parser.add_argument(
+        "--mode", choices=["start", "finish"], required=True
+    )
+    generation_state_parser.add_argument("--total", type=int, default=0)
+    generation_state_parser.add_argument("--completed", type=int, default=0)
     subparsers.add_parser("ingest-pdf")
+    subparsers.add_parser("split-topics")
     practicals_parser = subparsers.add_parser("generate-practicals")
     practicals_parser.add_argument("--source-pdf", required=True)
 
@@ -194,8 +253,18 @@ def main() -> int:
         return cmd_progress(root)
     if args.command == "notebooklm-auth":
         return cmd_notebooklm_auth(root)
+    if args.command == "reminder-sent":
+        return cmd_reminder_sent(root, args.key)
+    if args.command == "suppress-reminders":
+        return cmd_suppress_reminders(root, args.mode)
+    if args.command == "generation-notified":
+        return cmd_generation_notified(root)
+    if args.command == "generation-state":
+        return cmd_generation_state(root, args.mode, args.total, args.completed)
     if args.command == "ingest-pdf":
         return cmd_ingest_pdf(root)
+    if args.command == "split-topics":
+        return cmd_split_topics(root)
     if args.command == "generate-practicals":
         return cmd_generate_practicals(root, args.source_pdf)
     if args.command == "serve":

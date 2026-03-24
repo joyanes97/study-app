@@ -18,6 +18,7 @@ from study_app.study_store import (
     sync_generated_artifacts,
     update_daily_session_completion,
 )
+from study_app.targets import estimate_target_cards, estimate_target_questions
 
 
 def get_root() -> Path:
@@ -82,6 +83,8 @@ def build_dashboard_data(
                 "forgetting_risk": topic_progress.forgetting_risk,
                 "generated_cards": topic_progress.generated_cards,
                 "generated_quiz_items": topic_progress.generated_quiz_items,
+                "target_cards": estimate_target_cards(topic.title, topic.body),
+                "target_questions": estimate_target_questions(topic.title, topic.body),
                 "score": score_topic(topic, topic_progress, plan.days_left),
             }
         )
@@ -136,6 +139,10 @@ def _topic_score_to_dict(item) -> dict:
         "forgetting_risk": round(item.progress.forgetting_risk, 2),
         "generated_cards": item.progress.generated_cards,
         "generated_quiz_items": item.progress.generated_quiz_items,
+        "target_cards": estimate_target_cards(item.topic.title, item.topic.body),
+        "target_questions": estimate_target_questions(
+            item.topic.title, item.topic.body
+        ),
         "path": str(item.topic.source_path),
     }
 

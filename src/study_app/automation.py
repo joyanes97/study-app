@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from study_app.markdown_loader import load_topics
+from study_app.local_generator import generate_topic_artifacts
 from study_app.pdf_ingest import ingest_pdf_inbox
 from study_app.json_store import write_json
 from study_app.settings import load_settings
@@ -14,10 +15,14 @@ from study_app.study_store import (
     load_automation_report,
     load_generation_jobs,
     load_notebook_map,
+    load_notification_state,
+    load_reminder_state,
     load_source_index,
     save_automation_report,
     save_generation_jobs,
     save_notebook_map,
+    save_notification_state,
+    save_reminder_state,
     save_source_index,
     sync_generated_artifacts,
     topic_source_hash,
@@ -64,8 +69,12 @@ async def _generate_with_notebooklm(
                 flashcards = await client.artifacts.generate_flashcards(
                     notebook.id,
                     difficulty=QuizDifficulty.MEDIUM,
-                    quantity=QuizQuantity.MORE,
+                    quantity=QuizQuantity.FEWER,
                 )
+                if not getattr(flashcards, "task_id", None):
+                    raise RuntimeError(
+                        "NotebookLM flashcard generation returned no task id"
+                    )
                 await client.artifacts.wait_for_completion(
                     notebook.id, flashcards.task_id
                 )
@@ -76,9 +85,11 @@ async def _generate_with_notebooklm(
                 )
                 quiz = await client.artifacts.generate_quiz(
                     notebook.id,
-                    difficulty=QuizDifficulty.HARD,
+                    difficulty=QuizDifficulty.MEDIUM,
                     quantity=QuizQuantity.STANDARD,
                 )
+                if not getattr(quiz, "task_id", None):
+                    raise RuntimeError("NotebookLM quiz generation returned no task id")
                 await client.artifacts.wait_for_completion(notebook.id, quiz.task_id)
                 await client.artifacts.download_quiz(
                     notebook.id,
@@ -87,7 +98,11 @@ async def _generate_with_notebooklm(
                 )
                 generated_topics.append(topic.id)
             except Exception:
-                pending_auth_topics.append(topic.id)
+                try:
+                    generate_topic_artifacts(root, topic)
+                    generated_topics.append(topic.id)
+                except Exception:
+                    pending_auth_topics.append(topic.id)
 
     save_notebook_map(state_dir, notebook_map)
     return generated_topics, pending_auth_topics
@@ -180,9 +195,15 @@ def run_automation(root: Path) -> dict:
         progress_ratio = total_done / total_target
 
     now = datetime.now()
+    reminder_key = f"{now.date().isoformat()}-{now.hour:02d}"
+    reminder_state = load_reminder_state(state_dir)
+    notification_state = load_notification_state(state_dir)
+    already_sent = reminder_state.get("last_sent_key") == reminder_key
     needs_reminder = (
         today_session.get("status") != "completed"
         and now.hour in settings.reminder_hours
+        and not already_sent
+        and not notification_state.get("suppress_reminders", False)
     )
     summary_parts = []
     if changed_topics:
@@ -227,6 +248,13 @@ def run_automation(root: Path) -> dict:
                 "progress_ratio": round(progress_ratio, 2),
             },
             "needs_reminder": needs_reminder,
+            "reminder_key": reminder_key,
+            "reminder_already_sent": already_sent,
+            "reminders_suppressed": notification_state.get("suppress_reminders", False),
+            "generation_running": notification_state.get("generation_running", False),
+            "generation_complete_notified": notification_state.get(
+                "generation_complete_notified", False
+            ),
             "last_run": now.isoformat(),
             "summary": " | ".join(summary_parts),
         }
@@ -236,3 +264,45 @@ def run_automation(root: Path) -> dict:
     save_automation_report(state_dir, report)
     write_json(state_dir / "automation_status.json", report)
     return report
+
+
+def mark_reminder_sent(root: Path, reminder_key: str) -> dict:
+    state_dir = root / "data" / "state"
+    reminder_state = load_reminder_state(state_dir)
+    reminder_state["last_sent_key"] = reminder_key
+    reminder_state["last_sent_at"] = datetime.now().isoformat()
+    save_reminder_state(state_dir, reminder_state)
+    return reminder_state
+
+
+def set_reminder_suppression(root: Path, suppressed: bool) -> dict:
+    state_dir = root / "data" / "state"
+    notification_state = load_notification_state(state_dir)
+    notification_state["suppress_reminders"] = suppressed
+    notification_state["updated_at"] = datetime.now().isoformat()
+    save_notification_state(state_dir, notification_state)
+    return notification_state
+
+
+def mark_generation_running(
+    root: Path, running: bool, total_topics: int = 0, completed_topics: int = 0
+) -> dict:
+    state_dir = root / "data" / "state"
+    notification_state = load_notification_state(state_dir)
+    notification_state["generation_running"] = running
+    notification_state["generation_total_topics"] = total_topics
+    notification_state["generation_completed_topics"] = completed_topics
+    notification_state["generation_updated_at"] = datetime.now().isoformat()
+    if running:
+        notification_state["generation_complete_notified"] = False
+    save_notification_state(state_dir, notification_state)
+    return notification_state
+
+
+def mark_generation_notified(root: Path) -> dict:
+    state_dir = root / "data" / "state"
+    notification_state = load_notification_state(state_dir)
+    notification_state["generation_complete_notified"] = True
+    notification_state["generation_notified_at"] = datetime.now().isoformat()
+    save_notification_state(state_dir, notification_state)
+    return notification_state

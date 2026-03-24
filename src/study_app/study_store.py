@@ -6,6 +6,7 @@ from pathlib import Path
 
 from study_app.json_store import read_json, write_json
 from study_app.models import Topic
+from study_app.targets import estimate_target_cards, estimate_target_questions
 
 
 def _path(state_dir: Path, name: str) -> Path:
@@ -105,6 +106,29 @@ def save_pdf_ingest_index(state_dir: Path, payload: dict) -> Path:
     return write_json(_path(state_dir, "pdf_ingest_index.json"), payload)
 
 
+def load_reminder_state(state_dir: Path) -> dict:
+    return read_json(_path(state_dir, "reminder_state.json"), {})
+
+
+def save_reminder_state(state_dir: Path, payload: dict) -> Path:
+    return write_json(_path(state_dir, "reminder_state.json"), payload)
+
+
+def load_notification_state(state_dir: Path) -> dict:
+    return read_json(
+        _path(state_dir, "notification_state.json"),
+        {
+            "suppress_reminders": False,
+            "generation_complete_notified": False,
+            "generation_running": False,
+        },
+    )
+
+
+def save_notification_state(state_dir: Path, payload: dict) -> Path:
+    return write_json(_path(state_dir, "notification_state.json"), payload)
+
+
 def topic_source_hash(topic: Topic) -> str:
     raw = topic.body.encode("utf-8")
     return hashlib.sha1(raw).hexdigest()
@@ -117,12 +141,16 @@ def sync_generated_artifacts(
     questions_by_id: dict[str, dict] = {}
     topic_ids = {topic.id for topic in topics}
 
+    topic_map = {topic.id: topic for topic in topics}
+
     for path in sorted(generated_dir.glob("*-cards.json")):
         topic_id = path.name[: -len("-cards.json")]
         if topic_id not in topic_ids:
             continue
         payload = read_json(path, {"cards": []})
-        for index, card in enumerate(payload.get("cards", []), start=1):
+        topic = topic_map[topic_id]
+        limit = estimate_target_cards(topic.title, topic.body)
+        for index, card in enumerate(payload.get("cards", [])[:limit], start=1):
             card_id = f"{topic_id}-card-{index}"
             cards_by_id[card_id] = {
                 "id": card_id,
@@ -138,7 +166,9 @@ def sync_generated_artifacts(
         if topic_id not in topic_ids:
             continue
         payload = read_json(path, {"questions": []})
-        for index, question in enumerate(payload.get("questions", []), start=1):
+        topic = topic_map[topic_id]
+        limit = estimate_target_questions(topic.title, topic.body)
+        for index, question in enumerate(payload.get("questions", [])[:limit], start=1):
             question_id = f"{topic_id}-question-{index}"
             options = []
             for opt_index, option in enumerate(
