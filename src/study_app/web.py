@@ -16,6 +16,7 @@ from study_app.service import (
     mark_session_item_complete,
     next_card,
     next_question,
+    next_session_item,
     progress_summary,
     update_exam_date,
 )
@@ -112,6 +113,7 @@ def practicals(request: Request):
 @app.get("/study/session", response_class=HTMLResponse)
 def study_session(request: Request):
     data = build_dashboard_data(ROOT, date.today())
+    current_item = next_session_item(ROOT)
     return TEMPLATES.TemplateResponse(
         request,
         "session.html",
@@ -119,6 +121,8 @@ def study_session(request: Request):
             "request": request,
             "page_title": "Sesión diaria",
             "data": data,
+            "current_item": current_item,
+            "shown_at": datetime.now().isoformat(),
         },
     )
 
@@ -158,6 +162,26 @@ def review_card(
     )
     mark_session_item_complete(ROOT, "card", card_id)
     return RedirectResponse(url="/study/cards", status_code=303)
+
+
+@app.post("/study/session/cards/{card_id}/review")
+def review_card_from_session(
+    card_id: str,
+    rating: str = Form(...),
+    confidence: str = Form(...),
+    shown_at: str = Form(""),
+):
+    topic_id = card_id.split("-card-")[0]
+    record_card_review_event(
+        ROOT / "data" / "state",
+        card_id,
+        rating,
+        confidence,
+        shown_at,
+        topic_id=topic_id,
+    )
+    mark_session_item_complete(ROOT, "card", card_id)
+    return RedirectResponse(url="/study/session", status_code=303)
 
 
 @app.get("/study/quiz", response_class=HTMLResponse)
@@ -237,6 +261,59 @@ def answer_quiz(
             },
             "data": build_dashboard_data(ROOT, date.today()),
             "shown_at": datetime.now().isoformat(),
+        },
+    )
+
+
+@app.post("/study/session/quiz/{question_id}/answer", response_class=HTMLResponse)
+def answer_quiz_from_session(
+    question_id: str,
+    request: Request,
+    option_id: str = Form(...),
+    confidence: str = Form(...),
+    shown_at: str = Form(""),
+):
+    data = build_dashboard_data(ROOT, date.today())
+    selected_question = None
+    for question in data["today_questions"]:
+        if question["id"] == question_id:
+            selected_question = question
+            break
+    if not selected_question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    correct_option = next(
+        (option for option in selected_question["options"] if option["is_correct"]),
+        None,
+    )
+    is_correct = bool(correct_option and correct_option["id"] == option_id)
+    topic_id = question_id.split("-question-")[0]
+    record_question_attempt_event(
+        ROOT / "data" / "state",
+        question_id,
+        option_id,
+        is_correct,
+        confidence,
+        shown_at,
+        topic_id=topic_id,
+    )
+    mark_session_item_complete(ROOT, "question", question_id)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "session.html",
+        {
+            "request": request,
+            "page_title": "Sesión diaria",
+            "data": build_dashboard_data(ROOT, date.today()),
+            "current_item": next_session_item(ROOT),
+            "shown_at": datetime.now().isoformat(),
+            "feedback": {
+                "question": selected_question,
+                "selected_option": option_id,
+                "correct_option": correct_option,
+                "is_correct": is_correct,
+                "confidence": confidence,
+            },
         },
     )
 

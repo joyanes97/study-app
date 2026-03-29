@@ -143,6 +143,7 @@ def build_dashboard_data(
         ],
         "today_cards": today_cards,
         "today_questions": today_questions,
+        "study_queue": build_study_queue(today_cards, today_questions, daily_session),
         "session_targets": session_targets,
         "daily_session": daily_session,
         "automation_report": automation_report,
@@ -276,6 +277,37 @@ def next_question(root: Path | None = None, topic_id: str | None = None):
         if question["id"] not in done:
             return question
     return questions[0] if questions else None
+
+
+def next_session_item(root: Path | None = None):
+    data = build_dashboard_data(root, date.today())
+    queue = data["study_queue"]
+    return queue[0] if queue else None
+
+
+def build_study_queue(
+    today_cards: list[dict], today_questions: list[dict], daily_session: dict
+) -> list[dict]:
+    done_cards = set(daily_session.get("completed_cards", []))
+    done_questions = set(daily_session.get("completed_questions", []))
+    pending_cards = [
+        {"type": "card", "item": card}
+        for card in today_cards
+        if card["id"] not in done_cards
+    ]
+    pending_questions = [
+        {"type": "question", "item": question}
+        for question in today_questions
+        if question["id"] not in done_questions
+    ]
+    queue = []
+    max_len = max(len(pending_cards), len(pending_questions))
+    for index in range(max_len):
+        if index < len(pending_cards):
+            queue.append(pending_cards[index])
+        if index < len(pending_questions):
+            queue.append(pending_questions[index])
+    return queue
 
 
 def mark_session_item_complete(root: Path, item_type: str, item_id: str) -> dict:

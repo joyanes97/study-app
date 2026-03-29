@@ -195,7 +195,14 @@ def sync_generated_artifacts(
                 "title": payload.get("title") or "Quiz",
                 "question": question.get("question", ""),
                 "hint": question.get("hint", ""),
+                "explanation": question.get("explanation")
+                or question.get("hint")
+                or "",
                 "options": options,
+                "option_explanations": _option_explanations(
+                    options,
+                    question.get("hint") or question.get("explanation") or "",
+                ),
                 "source_file": path.name,
             }
 
@@ -204,6 +211,18 @@ def sync_generated_artifacts(
     save_cards(state_dir, cards)
     save_questions(state_dir, questions)
     return cards, questions
+
+
+def _option_explanations(options: list[dict], explanation: str) -> dict[str, str]:
+    correct_text = "La opcion correcta coincide con el contenido del tema."
+    wrong_text = (
+        explanation.strip()
+        or "Este distractor no se ajusta al punto principal que aparece en el temario."
+    )
+    return {
+        option["id"]: (correct_text if option["is_correct"] else wrong_text)
+        for option in options
+    }
 
 
 def ensure_daily_session(

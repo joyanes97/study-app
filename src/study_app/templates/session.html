@@ -3,8 +3,8 @@
 <section class="hero">
   <div>
     <p class="eyebrow">Sesion del dia</p>
-    <h1>La app decide que estudiar y en que formato</h1>
-    <p class="lead">No necesitas abrir apuntes. Entra, responde, corrige y deja que el sistema reprograme el resto.</p>
+    <h1>Una sola sesion guiada para llegar al examen en condiciones</h1>
+    <p class="lead">La app mezcla repaso, consolidacion y test en un flujo unico segun tu rendimiento y la fecha del examen.</p>
   </div>
   <div class="stats-grid">
     <article class="stat-card accent"><span>Tarjetas</span><strong>{{ data.daily_session.target_cards }}</strong></article>
@@ -14,21 +14,93 @@
   </div>
 </section>
 
-<section class="topics-grid">
-  <a class="topic-card cta-card" href="/study/cards">
-    <div class="topic-card-head"><span class="badge">Tarjetas</span></div>
-    <h2>Repasar tarjetas</h2>
-    <p>Empieza con memoria activa y espaciada.</p>
-  </a>
-  <a class="topic-card cta-card" href="/study/quiz">
-    <div class="topic-card-head"><span class="badge">Test</span></div>
-    <h2>Hacer test</h2>
-    <p>Practica preguntas con feedback inmediato.</p>
-  </a>
-  <a class="topic-card cta-card" href="/progress">
-    <div class="topic-card-head"><span class="badge">Progreso</span></div>
-    <h2>Ver progreso</h2>
-    <p>Comprueba si te falta material o estudio diario.</p>
-  </a>
+{% if feedback %}
+<article class="panel panel-wide feedback-panel {{ 'success' if feedback.is_correct else 'warning' }}">
+  <div class="panel-head"><h2>{{ 'Respuesta correcta' if feedback.is_correct else 'Respuesta incorrecta' }}</h2></div>
+  <p>{{ feedback.question.question }}</p>
+  <p><strong>Respuesta correcta:</strong> {{ feedback.correct_option.text if feedback.correct_option else 'No disponible' }}</p>
+  <p><strong>Por que es correcta:</strong> {{ feedback.question.explanation or feedback.question.hint or 'Coincide con el contenido del tema.' }}</p>
+  <ul class="action-list compact-list">
+    {% for option in feedback.question.options %}
+    <li>
+      {% if option.id == feedback.correct_option.id %}
+      <strong>{{ option.text }}</strong> — {{ feedback.question.option_explanations[option.id] if feedback.question.option_explanations else 'Es la opcion correcta.' }}
+      {% else %}
+      {{ option.text }} — {{ feedback.question.option_explanations[option.id] if feedback.question.option_explanations else 'No se ajusta al punto principal del tema.' }}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</article>
+{% endif %}
+
+{% if current_item %}
+<section class="content-grid">
+  <article class="panel panel-wide study-card">
+    <div class="panel-head">
+      <h2>{{ current_item.item.title }}</h2>
+      <span class="pill">{{ current_item.type }}</span>
+    </div>
+
+    {% if current_item.type == 'card' %}
+    <div class="flashcard-face">
+      <h3>Recuperacion activa</h3>
+      <p>{{ current_item.item.front }}</p>
+    </div>
+    <details class="flashcard-answer">
+      <summary>Mostrar respuesta</summary>
+      <p>{{ current_item.item.back }}</p>
+    </details>
+    <form method="post" action="/study/session/cards/{{ current_item.item.id }}/review" class="review-form">
+      <input type="hidden" name="shown_at" value="{{ shown_at }}">
+      <label class="confidence-field">Confianza
+        <select name="confidence" required>
+          <option value="low">Baja</option>
+          <option value="medium" selected>Media</option>
+          <option value="high">Alta</option>
+        </select>
+      </label>
+      <button type="submit" name="rating" value="again" class="danger">No la sabia</button>
+      <button type="submit" name="rating" value="hard">Dudosa</button>
+      <button type="submit" name="rating" value="good">Bien</button>
+      <button type="submit" name="rating" value="easy">Muy facil</button>
+    </form>
+    {% else %}
+    <p class="quiz-question">{{ current_item.item.question }}</p>
+    <form method="post" action="/study/session/quiz/{{ current_item.item.id }}/answer" class="quiz-form">
+      <input type="hidden" name="shown_at" value="{{ shown_at }}">
+      {% for option in current_item.item.options %}
+      <label class="quiz-option">
+        <input type="radio" name="option_id" value="{{ option.id }}" required>
+        <span>{{ option.text }}</span>
+      </label>
+      {% endfor %}
+      <label class="confidence-field">Confianza al responder
+        <select name="confidence" required>
+          <option value="low">Baja</option>
+          <option value="medium" selected>Media</option>
+          <option value="high">Alta</option>
+        </select>
+      </label>
+      <button type="submit">Responder</button>
+    </form>
+    {% endif %}
+  </article>
+
+  <aside class="panel">
+    <div class="panel-head"><h2>Hoy</h2></div>
+    <ul class="action-list">
+      <li>Cola restante: {{ data.study_queue|length }}</li>
+      <li>Tarjetas hechas: {{ data.daily_session.completed_cards|length }}/{{ data.daily_session.target_cards }}</li>
+      <li>Test hechos: {{ data.daily_session.completed_questions|length }}/{{ data.daily_session.target_questions }}</li>
+      <li>Fase: {{ data.phase }}</li>
+    </ul>
+  </aside>
 </section>
+{% else %}
+<article class="panel">
+  <h2>Sesion completada</h2>
+  <p>No quedan items pendientes en la cola de hoy. Puedes revisar progreso o pasar al modulo de practicos.</p>
+</article>
+{% endif %}
 {% endblock %}
