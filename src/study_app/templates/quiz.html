@@ -25,12 +25,20 @@
   </div>
   <p class="quiz-question">{{ question.question }}</p>
   <form method="post" action="/study/quiz/{{ question.id }}/answer" class="quiz-form">
+    <input type="hidden" name="shown_at" value="{{ shown_at }}">
     {% for option in question.options %}
     <label class="quiz-option">
       <input type="radio" name="option_id" value="{{ option.id }}" required>
       <span>{{ option.text }}</span>
     </label>
     {% endfor %}
+    <label class="confidence-field">Confianza al responder
+      <select name="confidence" required>
+        <option value="low">Baja</option>
+        <option value="medium" selected>Media</option>
+        <option value="high">Alta</option>
+      </select>
+    </label>
     <button type="submit">Responder</button>
   </form>
 </article>

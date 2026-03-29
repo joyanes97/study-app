@@ -6,7 +6,7 @@ from pathlib import Path
 from study_app.markdown_loader import load_topics
 from study_app.scheduler import build_daily_plan, score_topic
 from study_app.settings import load_settings, save_exam_date
-from study_app.state import load_progress
+from study_app.state import load_progress, save_progress
 from study_app.study_store import (
     ensure_daily_session,
     load_automation_report,
@@ -41,6 +41,15 @@ def load_runtime(root: Path | None = None):
     )
     card_reviews = load_card_reviews(root / "data" / "state")
     question_attempts = load_question_attempts(root / "data" / "state")
+    progress = recalculate_progress(
+        topics,
+        progress,
+        cards,
+        questions,
+        card_reviews,
+        question_attempts,
+    )
+    save_progress(root / "data" / "state", progress)
     return (
         root,
         settings,
@@ -218,11 +227,12 @@ def select_cards_for_today(
     return selected[:target_count]
 
 
-def _card_sort_key(card: dict, card_reviews: dict) -> tuple[int, str]:
+def _card_sort_key(card: dict, card_reviews: dict) -> tuple[int, str, float]:
     review = card_reviews.get(card["id"], {})
     next_due = review.get("next_due") or "1970-01-01"
     never_reviewed = 0 if review else -1
-    return (never_reviewed, next_due)
+    difficulty = -float(review.get("difficulty", 0.5))
+    return (never_reviewed, next_due, difficulty)
 
 
 def select_questions_for_today(
@@ -234,11 +244,12 @@ def select_questions_for_today(
     return selected[:target_count]
 
 
-def _question_sort_key(question: dict, attempts: dict) -> tuple[int, int]:
+def _question_sort_key(question: dict, attempts: dict) -> tuple[int, int, str]:
     attempt = attempts.get(question["id"], {})
     correct_count = int(attempt.get("correct_count", 0))
     attempt_count = int(attempt.get("attempt_count", 0))
-    return (correct_count, attempt_count)
+    next_due = attempt.get("next_due") or "1970-01-01"
+    return (correct_count, attempt_count, next_due)
 
 
 def next_card(root: Path | None = None, topic_id: str | None = None):
@@ -290,3 +301,90 @@ def progress_summary(root: Path | None = None) -> dict:
 def update_exam_date(root: Path | None, new_exam_date: date) -> Path:
     root = root or get_root()
     return save_exam_date(root, new_exam_date)
+
+
+def recalculate_progress(
+    topics,
+    progress,
+    cards,
+    questions,
+    card_reviews,
+    question_attempts,
+):
+    card_by_topic = {}
+    for card in cards:
+        card_by_topic.setdefault(card["topic_id"], []).append(card)
+    question_by_topic = {}
+    for question in questions:
+        question_by_topic.setdefault(question["topic_id"], []).append(question)
+
+    today = date.today().isoformat()
+    for topic in topics:
+        topic_cards = card_by_topic.get(topic.id, [])
+        topic_questions = question_by_topic.get(topic.id, [])
+        card_scores = []
+        due_count = 0
+        lapses = 0
+        for card in topic_cards:
+            review = card_reviews.get(card["id"], {})
+            if not review:
+                card_scores.append(0.2)
+                due_count += 1
+                continue
+            rating_score = {"again": 0.1, "hard": 0.45, "good": 0.75, "easy": 0.9}.get(
+                review.get("last_rating"), 0.4
+            )
+            confidence_score = {"low": -0.08, "medium": 0.0, "high": 0.06}.get(
+                review.get("last_confidence"), 0.0
+            )
+            card_scores.append(max(0.0, min(1.0, rating_score + confidence_score)))
+            if (review.get("next_due") or today) <= today:
+                due_count += 1
+            lapses += int(review.get("lapse_count", 0))
+
+        question_scores = []
+        incorrect_recent = 0
+        for question in topic_questions:
+            attempt = question_attempts.get(question["id"], {})
+            attempt_count = int(attempt.get("attempt_count", 0))
+            if attempt_count == 0:
+                question_scores.append(0.2)
+                due_count += 1
+                continue
+            accuracy = int(attempt.get("correct_count", 0)) / max(attempt_count, 1)
+            confidence_bonus = {"low": -0.08, "medium": 0.0, "high": 0.06}.get(
+                attempt.get("last_confidence"), 0.0
+            )
+            question_scores.append(max(0.0, min(1.0, accuracy + confidence_bonus)))
+            if not attempt.get("last_correct", False):
+                incorrect_recent += 1
+            if (attempt.get("next_due") or today) <= today:
+                due_count += 1
+
+        scores = card_scores + question_scores
+        mastery = sum(scores) / len(scores) if scores else 0.3
+        total_items = max(len(topic_cards) + len(topic_questions), 1)
+        due_ratio = due_count / total_items
+        error_ratio = (
+            incorrect_recent / max(len(topic_questions), 1) if topic_questions else 0.0
+        )
+        lapse_ratio = lapses / max(len(topic_cards), 1) if topic_cards else 0.0
+        forgetting_risk = max(
+            0.1,
+            min(
+                1.0,
+                0.2
+                + due_ratio * 0.45
+                + error_ratio * 0.25
+                + lapse_ratio * 0.2
+                - mastery * 0.25,
+            ),
+        )
+
+        topic_progress = progress[topic.id]
+        topic_progress.mastery = round(mastery, 2)
+        topic_progress.forgetting_risk = round(forgetting_risk, 2)
+        topic_progress.generated_cards = len(topic_cards)
+        topic_progress.generated_quiz_items = len(topic_questions)
+        topic_progress.incorrect_streak = incorrect_recent
+    return progress

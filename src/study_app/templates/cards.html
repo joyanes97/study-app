@@ -24,6 +24,14 @@
       <p>{{ card.back }}</p>
     </details>
     <form method="post" action="/study/cards/{{ card.id }}/review" class="review-form">
+      <input type="hidden" name="shown_at" value="{{ shown_at }}">
+      <label class="confidence-field">Confianza
+        <select name="confidence" required>
+          <option value="low">Baja</option>
+          <option value="medium" selected>Media</option>
+          <option value="high">Alta</option>
+        </select>
+      </label>
       <button type="submit" name="rating" value="again" class="danger">No la sabia</button>
       <button type="submit" name="rating" value="hard">Dudosa</button>
       <button type="submit" name="rating" value="good">Bien</button>

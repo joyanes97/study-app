@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import markdown as md
@@ -19,7 +19,10 @@ from study_app.service import (
     progress_summary,
     update_exam_date,
 )
-from study_app.study_store import record_card_review, record_question_attempt
+from study_app.study_store import (
+    record_card_review_event,
+    record_question_attempt_event,
+)
 
 ROOT = get_root()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -132,13 +135,27 @@ def study_cards(request: Request, topic: str | None = Query(default=None)):
             "page_title": "Tarjetas",
             "card": card,
             "data": data,
+            "shown_at": datetime.now().isoformat(),
         },
     )
 
 
 @app.post("/study/cards/{card_id}/review")
-def review_card(card_id: str, rating: str = Form(...)):
-    record_card_review(ROOT / "data" / "state", card_id, rating)
+def review_card(
+    card_id: str,
+    rating: str = Form(...),
+    confidence: str = Form(...),
+    shown_at: str = Form(""),
+):
+    topic_id = card_id.split("-card-")[0]
+    record_card_review_event(
+        ROOT / "data" / "state",
+        card_id,
+        rating,
+        confidence,
+        shown_at,
+        topic_id=topic_id,
+    )
     mark_session_item_complete(ROOT, "card", card_id)
     return RedirectResponse(url="/study/cards", status_code=303)
 
@@ -166,12 +183,19 @@ def study_quiz(
             "question": question,
             "feedback": feedback,
             "data": build_dashboard_data(ROOT, date.today()),
+            "shown_at": datetime.now().isoformat(),
         },
     )
 
 
 @app.post("/study/quiz/{question_id}/answer", response_class=HTMLResponse)
-def answer_quiz(question_id: str, request: Request, option_id: str = Form(...)):
+def answer_quiz(
+    question_id: str,
+    request: Request,
+    option_id: str = Form(...),
+    confidence: str = Form(...),
+    shown_at: str = Form(""),
+):
     data = build_dashboard_data(ROOT, date.today())
     selected_question = None
     for question in data["today_questions"]:
@@ -186,7 +210,16 @@ def answer_quiz(question_id: str, request: Request, option_id: str = Form(...)):
         None,
     )
     is_correct = bool(correct_option and correct_option["id"] == option_id)
-    record_question_attempt(ROOT / "data" / "state", question_id, option_id, is_correct)
+    topic_id = question_id.split("-question-")[0]
+    record_question_attempt_event(
+        ROOT / "data" / "state",
+        question_id,
+        option_id,
+        is_correct,
+        confidence,
+        shown_at,
+        topic_id=topic_id,
+    )
     mark_session_item_complete(ROOT, "question", question_id)
     return TEMPLATES.TemplateResponse(
         request,
@@ -200,8 +233,10 @@ def answer_quiz(question_id: str, request: Request, option_id: str = Form(...)):
                 "selected_option": option_id,
                 "correct_option": correct_option,
                 "is_correct": is_correct,
+                "confidence": confidence,
             },
             "data": build_dashboard_data(ROOT, date.today()),
+            "shown_at": datetime.now().isoformat(),
         },
     )
 
