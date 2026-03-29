@@ -49,7 +49,15 @@
     <div class="panel-head"><h2>Parte B · Desarrollo</h2></div>
     {% if data.practicals %}
     <p><strong>{{ data.practicals[0].title }}</strong></p>
-    <p class="note">Redacta una actuacion policial estructurada, con fundamento juridico, diligencias y resolucion final.</p>
+    <p class="note">{{ data.practicals[0].summary }}</p>
+    <div class="mock-rubric">
+      <h3>Rubrica de correccion</h3>
+      <ul class="action-list compact-list">
+        {% for item in data.practicals[0].rubric %}
+        <li>{{ item.criterion }} — {{ item.points }} puntos</li>
+        {% endfor %}
+      </ul>
+    </div>
     <textarea name="practical_text" class="mock-textarea" placeholder="Desarrolla aqui el caso practico..."></textarea>
     {% else %}
     <p>No hay practicos cargados.</p>

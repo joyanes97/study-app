@@ -3,8 +3,14 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 import uuid
+import re
 
 from study_app.markdown_loader import load_topics
+from study_app.practical_cases import (
+    build_practical_rubric,
+    parse_practical_cases,
+    practical_case_summary,
+)
 from study_app.scheduler import build_daily_plan, score_topic
 from study_app.settings import load_settings, save_exam_date
 from study_app.state import load_progress, save_progress
@@ -402,14 +408,27 @@ def build_mock_exam_data(root: Path | None = None) -> dict:
     theory_questions = [
         q for q in data["today_questions"] if q.get("content_type") == "theory"
     ]
-    practical_questions = [
-        q for q in data["today_questions"] if q.get("content_type") == "practical"
-    ]
+    practical_payload = []
+    if data["practicals"]:
+        practical_topic = find_topic(data["practicals"][0]["id"], root or get_root())
+        if practical_topic:
+            cases = parse_practical_cases(practical_topic["topic"].body)
+            if cases:
+                case = cases[0]
+                practical_payload = [
+                    {
+                        "topic_id": practical_topic["topic"].id,
+                        "title": practical_topic["topic"].title,
+                        "case": case,
+                        "summary": practical_case_summary(case),
+                        "rubric": build_practical_rubric(case),
+                    }
+                ]
     return {
         "exam_date": data["exam_date"],
         "days_left": data["days_left"],
         "theory_questions": theory_questions[:20],
-        "practicals": data["practicals"][:1],
+        "practicals": practical_payload,
         "time_limit_minutes": 180,
     }
 
@@ -447,9 +466,13 @@ def score_mock_exam(
 
     practical_score = 0.0
     practical_feedback = "No evaluado porque la Parte A no alcanzó 5.0."
+    practical_case = None
+    mock_data = build_mock_exam_data(root)
+    if mock_data["practicals"]:
+        practical_case = mock_data["practicals"][0]["case"]
     if part_a_passed:
         practical_score, practical_feedback = evaluate_practical_submission(
-            practical_text
+            practical_text, practical_case
         )
 
     final_score = (
@@ -478,7 +501,9 @@ def score_mock_exam(
     return record
 
 
-def evaluate_practical_submission(practical_text: str) -> tuple[float, str]:
+def evaluate_practical_submission(
+    practical_text: str, practical_case: dict | None = None
+) -> tuple[float, str]:
     text = practical_text.strip()
     if not text:
         return 0.0, "No se ha entregado desarrollo del supuesto práctico."
@@ -494,19 +519,52 @@ def evaluate_practical_submission(practical_text: str) -> tuple[float, str]:
         "denuncia",
         "infracción",
     ]
+    case_terms = []
+    if practical_case:
+        case_terms.extend(_extract_case_terms(practical_case.get("facts", "")))
+        case_terms.extend(
+            _extract_case_terms(" ".join(practical_case.get("documents", [])))
+        )
+        case_terms.extend(
+            _extract_case_terms(" ".join(practical_case.get("police_action", [])))
+        )
     keyword_hits = sum(1 for word in keywords if word in lowered)
+    case_hits = sum(1 for term in case_terms if term in lowered)
     length_score = min(len(text) / 1800, 1.0)
     keyword_score = min(keyword_hits / 5, 1.0)
+    case_score = min(case_hits / max(len(case_terms), 1), 1.0) if case_terms else 0.5
     structure_score = 1.0 if ("1." in text or "- " in text or "•" in text) else 0.5
     score = round(
-        min(10.0, (length_score * 4 + keyword_score * 4 + structure_score * 2)), 2
+        min(
+            10.0,
+            (
+                length_score * 3
+                + keyword_score * 3
+                + case_score * 2
+                + structure_score * 2
+            ),
+        ),
+        2,
     )
     feedback = (
         f"Desarrollo con longitud {'adecuada' if length_score > 0.6 else 'mejorable'}, "
-        f"cobertura jurídica {'sólida' if keyword_score > 0.6 else 'limitada'} y "
+        f"cobertura jurídica {'sólida' if keyword_score > 0.6 else 'limitada'}, "
+        f"ajuste al caso {'alto' if case_score > 0.6 else 'mejorable'} y "
         f"estructura {'clara' if structure_score > 0.8 else 'mejorable'}."
     )
     return score, feedback
+
+
+def _extract_case_terms(text: str) -> list[str]:
+    words = re.findall(r"[a-záéíóúñ]{5,}", text.lower())
+    dedup = []
+    seen = set()
+    for word in words:
+        if word in seen:
+            continue
+        seen.add(word)
+        dedup.append(word)
+    return dedup[:8]
 
 
 def update_exam_date(root: Path | None, new_exam_date: date) -> Path:

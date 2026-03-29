@@ -9,6 +9,7 @@ from itertools import cycle
 import httpx
 
 from study_app.models import Topic
+from study_app.practical_cases import parse_practical_cases
 from study_app.targets import estimate_target_cards, estimate_target_questions
 
 
@@ -33,6 +34,8 @@ def generate_topic_artifacts(root: Path, topic: Topic) -> tuple[Path, Path]:
 
 
 def _generate_cards(topic: Topic, target: int) -> dict:
+    if topic.content_type == "practical":
+        return _generate_practical_cards(topic, target)
     if os.environ.get("LOCAL_QWEN_DISABLE") == "1":
         return _fallback_cards(topic, target)
     try:
@@ -48,6 +51,8 @@ def _generate_cards(topic: Topic, target: int) -> dict:
 
 
 def _generate_quiz(topic: Topic, target: int) -> dict:
+    if topic.content_type == "practical":
+        return _generate_practical_quiz(topic, target)
     if os.environ.get("LOCAL_QWEN_DISABLE") == "1":
         return _fallback_quiz(topic, target)
     try:
@@ -216,6 +221,106 @@ def _fallback_quiz(topic: Topic, target: int) -> dict:
     for fact in _repeat_to_target(facts, target):
         questions.append(_quiz_from_fact(topic.title, fact, pools))
     return {"title": topic.title, "questions": questions}
+
+
+def _generate_practical_cards(topic: Topic, target: int) -> dict:
+    cases = parse_practical_cases(topic.body)
+    cards = []
+    for case in cases:
+        if case.get("facts"):
+            cards.append(
+                {
+                    "front": f"En el supuesto '{case['title']}', ¿qué hechos relevantes justifican la intervención policial?",
+                    "back": case["facts"],
+                }
+            )
+        if case.get("police_action"):
+            cards.append(
+                {
+                    "front": f"¿Cuál es la actuación policial prioritaria en el supuesto '{case['title']}'?",
+                    "back": case["police_action"][0],
+                }
+            )
+        if case.get("documents"):
+            cards.append(
+                {
+                    "front": f"¿Qué diligencia o documento debe tramitarse en el supuesto '{case['title']}'?",
+                    "back": case["documents"][0],
+                }
+            )
+        if case.get("resolution"):
+            cards.append(
+                {
+                    "front": f"¿Cuál es la resolución final esperable en el supuesto '{case['title']}'?",
+                    "back": case["resolution"],
+                }
+            )
+    if not cards:
+        return _fallback_cards(topic, target)
+    return {"title": topic.title, "cards": cards[:target]}
+
+
+def _generate_practical_quiz(topic: Topic, target: int) -> dict:
+    cases = parse_practical_cases(topic.body)
+    questions = []
+    for case in cases:
+        if case.get("police_action"):
+            correct = case["police_action"][0]
+            wrongs = _practical_distractors(case, correct)
+            questions.append(
+                {
+                    "question": f"En el supuesto '{case['title']}', ¿cuál debería ser la primera actuación policial prioritaria?",
+                    "hint": case.get("facts")
+                    or case.get("context")
+                    or case.get("resolution", ""),
+                    "explanation": f"La prioridad operativa correcta es: {correct}",
+                    "answerOptions": [
+                        {"text": correct, "isCorrect": True},
+                        {"text": wrongs[0], "isCorrect": False},
+                        {"text": wrongs[1], "isCorrect": False},
+                        {"text": wrongs[2], "isCorrect": False},
+                    ],
+                }
+            )
+        if case.get("documents"):
+            correct = case["documents"][0]
+            wrongs = _practical_distractors(case, correct)
+            questions.append(
+                {
+                    "question": f"En el supuesto '{case['title']}', ¿qué diligencia o documentación es más adecuada?",
+                    "hint": case.get("facts")
+                    or case.get("context")
+                    or case.get("resolution", ""),
+                    "explanation": f"La diligencia más adecuada es: {correct}",
+                    "answerOptions": [
+                        {"text": correct, "isCorrect": True},
+                        {"text": wrongs[0], "isCorrect": False},
+                        {"text": wrongs[1], "isCorrect": False},
+                        {"text": wrongs[2], "isCorrect": False},
+                    ],
+                }
+            )
+    if not questions:
+        return _fallback_quiz(topic, target)
+    return {"title": topic.title, "questions": questions[:target]}
+
+
+def _practical_distractors(case: dict, correct: str) -> list[str]:
+    pool = []
+    for item in case.get("documents", []) + case.get("police_action", []):
+        if item != correct and item not in pool:
+            pool.append(item)
+    generic = [
+        "Abandonar la intervención sin documentar los hechos.",
+        "Resolver verbalmente el problema sin practicar diligencias.",
+        "Esperar instrucciones sin asegurar la situación inicial.",
+    ]
+    for item in generic:
+        if item != correct and item not in pool:
+            pool.append(item)
+    while len(pool) < 3:
+        pool.append("Actuación no ajustada al supuesto práctico.")
+    return pool[:3]
 
 
 def _build_facts(topic: Topic) -> list[dict]:
