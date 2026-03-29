@@ -3,7 +3,7 @@
     "defaults": {
       "workspace": "/home/jose/exam-study-app",
       "provider": "zhipu",
-      "model": "glm-4.5"
+      "model": "glm-5-turbo"
     }
   },
   "providers": {

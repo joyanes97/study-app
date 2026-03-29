@@ -9,6 +9,7 @@ from study_app.local_generator import generate_topic_artifacts
 from study_app.pdf_ingest import ingest_pdf_inbox
 from study_app.json_store import write_json
 from study_app.settings import load_settings
+from study_app.source_normalizer import ensure_normalized_source
 from study_app.state import load_progress, save_progress
 from study_app.study_store import (
     ensure_daily_session,
@@ -63,8 +64,9 @@ async def _generate_with_notebooklm(
                     f"{topic.subject} - {topic.title} [{topic.id}]"
                 )
                 notebook_map[topic.id] = notebook.id
+                normalized_source = ensure_normalized_source(root, topic)
                 await client.sources.add_file(
-                    notebook.id, str(topic.source_path), wait=True
+                    notebook.id, str(normalized_source), wait=True
                 )
                 flashcards = await client.artifacts.generate_flashcards(
                     notebook.id,

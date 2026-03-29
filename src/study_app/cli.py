@@ -23,6 +23,7 @@ from study_app.practical_cases import (
 from study_app.scheduler import build_daily_plan
 from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
+from study_app.source_normalizer import ensure_normalized_source
 from study_app.state import load_progress
 from study_app.topic_splitter import split_block_markdown
 
@@ -195,6 +196,18 @@ def cmd_split_topics(root: Path) -> int:
     return 0
 
 
+def cmd_normalize_sources(root: Path) -> int:
+    settings = load_settings(root)
+    topics = load_topics(
+        root / "data" / "content",
+        settings.default_priority,
+        settings.default_topic_weight,
+    )
+    written = [ensure_normalized_source(root, topic) for topic in topics]
+    print(f"Normalized sources: {len(written)}")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -228,6 +241,7 @@ def main() -> int:
     generation_state_parser.add_argument("--total", type=int, default=0)
     generation_state_parser.add_argument("--completed", type=int, default=0)
     subparsers.add_parser("ingest-pdf")
+    subparsers.add_parser("normalize-sources")
     subparsers.add_parser("split-topics")
     practicals_parser = subparsers.add_parser("generate-practicals")
     practicals_parser.add_argument("--source-pdf", required=True)
@@ -263,6 +277,8 @@ def main() -> int:
         return cmd_generation_state(root, args.mode, args.total, args.completed)
     if args.command == "ingest-pdf":
         return cmd_ingest_pdf(root)
+    if args.command == "normalize-sources":
+        return cmd_normalize_sources(root)
     if args.command == "split-topics":
         return cmd_split_topics(root)
     if args.command == "generate-practicals":
