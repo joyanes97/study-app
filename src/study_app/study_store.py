@@ -163,6 +163,7 @@ def sync_generated_artifacts(
             cards_by_id[card_id] = {
                 "id": card_id,
                 "topic_id": topic_id,
+                "content_type": topic.content_type,
                 "title": payload.get("title") or "Flashcards",
                 "front": card.get("front") or card.get("f") or "",
                 "back": card.get("back") or card.get("b") or "",
@@ -192,6 +193,7 @@ def sync_generated_artifacts(
             questions_by_id[question_id] = {
                 "id": question_id,
                 "topic_id": topic_id,
+                "content_type": topic.content_type,
                 "title": payload.get("title") or "Quiz",
                 "question": question.get("question", ""),
                 "hint": question.get("hint", ""),

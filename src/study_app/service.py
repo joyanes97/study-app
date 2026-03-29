@@ -110,14 +110,29 @@ def build_dashboard_data(
     topic_rows.sort(key=lambda item: item["score"], reverse=True)
     practical_rows.sort(key=lambda item: item["score"], reverse=True)
     session_targets = calculate_session_targets(
-        plan.days_left, plan.phase, len(cards), len(questions)
+        plan.days_left,
+        plan.phase,
+        len(cards),
+        len(questions),
+        practical_rows,
     )
-    today_cards = select_cards_for_today(
+    today_theory_cards = select_cards_for_today(
         plan, cards, card_reviews, session_targets["cards"]
     )
-    today_questions = select_questions_for_today(
+    today_theory_questions = select_questions_for_today(
         plan, questions, question_attempts, session_targets["questions"]
     )
+    today_practical_cards = select_practical_cards(
+        practical_rows, cards, card_reviews, session_targets["practical_cards"]
+    )
+    today_practical_questions = select_practical_questions(
+        practical_rows,
+        questions,
+        question_attempts,
+        session_targets["practical_questions"],
+    )
+    today_cards = today_theory_cards + today_practical_cards
+    today_questions = today_theory_questions + today_practical_questions
     daily_session = ensure_daily_session(
         root / "data" / "state", plan_date, today_cards, today_questions
     )
@@ -141,6 +156,10 @@ def build_dashboard_data(
         "mixed_quiz_topics": [
             _topic_score_to_dict(item) for item in plan.mixed_quiz_topics
         ],
+        "today_theory_cards": today_theory_cards,
+        "today_theory_questions": today_theory_questions,
+        "today_practical_cards": today_practical_cards,
+        "today_practical_questions": today_practical_questions,
         "today_cards": today_cards,
         "today_questions": today_questions,
         "study_queue": build_study_queue(today_cards, today_questions, daily_session),
@@ -190,17 +209,27 @@ def find_topic(topic_id: str, root: Path | None = None):
 
 
 def calculate_session_targets(
-    days_left: int, phase: str, card_pool: int, question_pool: int
+    days_left: int,
+    phase: str,
+    card_pool: int,
+    question_pool: int,
+    practical_rows: list[dict],
 ) -> dict:
     if phase == "build":
         cards_target = 18
         questions_target = 8
+        practical_cards_target = 0
+        practical_questions_target = 0
     elif phase == "consolidate":
         cards_target = 14
         questions_target = 12
+        practical_cards_target = 2 if practical_rows else 0
+        practical_questions_target = 2 if practical_rows else 0
     else:
         cards_target = 10 if days_left <= 7 else 12
         questions_target = 16 if days_left <= 7 else 14
+        practical_cards_target = 2 if practical_rows else 0
+        practical_questions_target = 4 if practical_rows else 0
 
     cards_target = min(cards_target, card_pool)
     questions_target = min(questions_target, question_pool)
@@ -213,6 +242,8 @@ def calculate_session_targets(
     return {
         "cards": cards_target,
         "questions": questions_target,
+        "practical_cards": practical_cards_target,
+        "practical_questions": practical_questions_target,
     }
 
 
@@ -240,6 +271,31 @@ def select_questions_for_today(
     plan, questions: list[dict], attempts: dict, target_count: int
 ) -> list[dict]:
     topic_ids = {item.topic.id for item in (plan.weak_topics + plan.mixed_quiz_topics)}
+    selected = [question for question in questions if question["topic_id"] in topic_ids]
+    selected.sort(key=lambda question: _question_sort_key(question, attempts))
+    return selected[:target_count]
+
+
+def select_practical_cards(
+    practical_rows: list[dict], cards: list[dict], card_reviews: dict, target_count: int
+) -> list[dict]:
+    if target_count <= 0:
+        return []
+    topic_ids = {item["id"] for item in practical_rows[:2]}
+    selected = [card for card in cards if card["topic_id"] in topic_ids]
+    selected.sort(key=lambda card: _card_sort_key(card, card_reviews))
+    return selected[:target_count]
+
+
+def select_practical_questions(
+    practical_rows: list[dict],
+    questions: list[dict],
+    attempts: dict,
+    target_count: int,
+) -> list[dict]:
+    if target_count <= 0:
+        return []
+    topic_ids = {item["id"] for item in practical_rows[:2]}
     selected = [question for question in questions if question["topic_id"] in topic_ids]
     selected.sort(key=lambda question: _question_sort_key(question, attempts))
     return selected[:target_count]
@@ -291,12 +347,16 @@ def build_study_queue(
     done_cards = set(daily_session.get("completed_cards", []))
     done_questions = set(daily_session.get("completed_questions", []))
     pending_cards = [
-        {"type": "card", "item": card}
+        {"type": "card", "item": card, "content_type": _content_type_for_item(card)}
         for card in today_cards
         if card["id"] not in done_cards
     ]
     pending_questions = [
-        {"type": "question", "item": question}
+        {
+            "type": "question",
+            "item": question,
+            "content_type": _content_type_for_item(question),
+        }
         for question in today_questions
         if question["id"] not in done_questions
     ]
@@ -308,6 +368,10 @@ def build_study_queue(
         if index < len(pending_questions):
             queue.append(pending_questions[index])
     return queue
+
+
+def _content_type_for_item(item: dict) -> str:
+    return item.get("content_type", "theory")
 
 
 def mark_session_item_complete(root: Path, item_type: str, item_id: str) -> dict:

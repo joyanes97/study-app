@@ -11,6 +11,7 @@
     <article class="stat-card"><span>Preguntas</span><strong>{{ data.daily_session.target_questions }}</strong></article>
     <article class="stat-card"><span>Completadas</span><strong>{{ data.daily_session.completed_cards|length + data.daily_session.completed_questions|length }}</strong></article>
     <article class="stat-card"><span>Estado</span><strong>{{ data.daily_session.status }}</strong></article>
+    <article class="stat-card"><span>Practicos hoy</span><strong>{{ data.session_targets.practical_cards + data.session_targets.practical_questions }}</strong></article>
   </div>
 </section>
 
@@ -39,7 +40,7 @@
   <article class="panel panel-wide study-card">
     <div class="panel-head">
       <h2>{{ current_item.item.title }}</h2>
-      <span class="pill">{{ current_item.type }}</span>
+      <span class="pill">{{ current_item.type }} · {{ current_item.content_type }}</span>
     </div>
 
     {% if current_item.type == 'card' %}
@@ -93,6 +94,7 @@
       <li>Cola restante: {{ data.study_queue|length }}</li>
       <li>Tarjetas hechas: {{ data.daily_session.completed_cards|length }}/{{ data.daily_session.target_cards }}</li>
       <li>Test hechos: {{ data.daily_session.completed_questions|length }}/{{ data.daily_session.target_questions }}</li>
+      <li>Practicos hoy: {{ data.session_targets.practical_cards + data.session_targets.practical_questions }}</li>
       <li>Fase: {{ data.phase }}</li>
     </ul>
   </aside>
