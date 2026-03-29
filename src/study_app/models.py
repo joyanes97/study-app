@@ -15,6 +15,7 @@ PRIORITY_FACTORS = {
 @dataclass
 class Topic:
     id: str
+    content_type: str
     subject: str
     topic: str
     subtopic: str

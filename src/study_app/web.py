@@ -87,6 +87,21 @@ def topic_detail(topic_id: str, request: Request):
             "rendered_markdown": html,
             "cards": payload["cards"],
             "questions": payload["questions"],
+            "content_type": topic.content_type,
+        },
+    )
+
+
+@app.get("/practicals", response_class=HTMLResponse)
+def practicals(request: Request):
+    data = build_dashboard_data(ROOT, date.today())
+    return TEMPLATES.TemplateResponse(
+        request,
+        "practicals.html",
+        {
+            "request": request,
+            "page_title": "Practicos",
+            "data": data,
         },
     )
 

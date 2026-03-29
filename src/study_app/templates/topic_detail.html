@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">Tema</p>
     <h1>{{ topic.title }}</h1>
-    <p class="lead">{{ topic.subject }} · {{ topic.topic }} · {{ topic.subtopic }}</p>
+    <p class="lead">{{ content_type }} · {{ topic.subject }} · {{ topic.topic }} · {{ topic.subtopic }}</p>
   </div>
   <div class="stats-grid compact">
     <article class="stat-card"><span>Prioridad</span><strong>{{ topic.priority }}</strong></article>
@@ -23,7 +23,7 @@
       <li>Tarjetas: {{ progress.generated_cards }}</li>
       <li>Quiz items: {{ progress.generated_quiz_items }}</li>
     </ul>
-    <p class="note">Cuando importes los JSON de NotebookLM, esta vista reflejara el material disponible.</p>
+    <p class="note">{% if content_type == 'practical' %}Este contenido pertenece al modulo independiente de practicos.{% else %}Este contenido pertenece al modulo teorico y se usa para tarjetas, test y repeticion espaciada.{% endif %}</p>
   </aside>
 </section>
 {% endblock %}

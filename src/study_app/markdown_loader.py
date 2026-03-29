@@ -44,6 +44,7 @@ def load_topics(
         fallback = path.stem.replace("-", " ").replace("_", " ").strip().title()
         title = title_from_body(body, fallback)
         rel_parts = path.relative_to(content_dir).parts
+        content_type = meta.get("content_type") or infer_content_type(path, title)
         subject = meta.get("subject") or (
             rel_parts[0] if len(rel_parts) > 1 else "general"
         )
@@ -55,6 +56,7 @@ def load_topics(
         topics.append(
             Topic(
                 id=digest,
+                content_type=content_type,
                 subject=subject,
                 topic=topic_name,
                 subtopic=subtopic,
@@ -66,3 +68,15 @@ def load_topics(
             )
         )
     return topics
+
+
+def infer_content_type(path: Path, title: str) -> str:
+    lower = str(path).lower()
+    title_lower = title.lower()
+    if (
+        "/practicals/" in lower
+        or "supuestos" in title_lower
+        or "practicos" in title_lower
+    ):
+        return "practical"
+    return "theory"

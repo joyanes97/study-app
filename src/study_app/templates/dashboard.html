@@ -25,6 +25,10 @@
       <strong>{{ data.topic_count }}</strong>
     </article>
     <article class="stat-card">
+      <span>Practicos</span>
+      <strong>{{ data.practical_count }}</strong>
+    </article>
+    <article class="stat-card">
       <span>Material listo</span>
       <strong>{{ data.card_count }} / {{ data.question_count }}</strong>
     </article>
@@ -140,6 +144,20 @@
         </tbody>
       </table>
     </div>
+  </article>
+
+  <article class="panel panel-wide">
+    <div class="panel-head">
+      <h2>Modulo de practicos</h2>
+      <a href="/practicals">Abrir practicos</a>
+    </div>
+    <ul class="item-list">
+      {% for topic in data.practicals %}
+      <li><a href="/topics/{{ topic.id }}">{{ topic.title }}</a><span>{{ topic.generated_cards }} tarjetas · {{ topic.generated_quiz_items }} test</span></li>
+      {% else %}
+      <li class="empty">Sin practicos cargados</li>
+      {% endfor %}
+    </ul>
   </article>
 </section>
 {% endblock %}

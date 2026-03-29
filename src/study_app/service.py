@@ -33,6 +33,8 @@ def load_runtime(root: Path | None = None):
         settings.default_priority,
         settings.default_topic_weight,
     )
+    theory_topics = [topic for topic in topics if topic.content_type == "theory"]
+    practical_topics = [topic for topic in topics if topic.content_type == "practical"]
     progress = load_progress(root / "data" / "state", topics)
     cards, questions = sync_generated_artifacts(
         root / "data" / "state", root / "data" / "generated", topics
@@ -43,6 +45,8 @@ def load_runtime(root: Path | None = None):
         root,
         settings,
         topics,
+        theory_topics,
+        practical_topics,
         progress,
         cards,
         questions,
@@ -58,6 +62,8 @@ def build_dashboard_data(
         root,
         settings,
         topics,
+        theory_topics,
+        practical_topics,
         progress,
         cards,
         questions,
@@ -65,30 +71,35 @@ def build_dashboard_data(
         question_attempts,
     ) = load_runtime(root)
     plan_date = plan_date or date.today()
-    plan = build_daily_plan(topics, progress, plan_date, settings)
+    plan = build_daily_plan(theory_topics, progress, plan_date, settings)
     topic_rows = []
+    practical_rows = []
     for topic in topics:
         topic_progress = progress[topic.id]
-        topic_rows.append(
-            {
-                "id": topic.id,
-                "subject": topic.subject,
-                "topic": topic.topic,
-                "subtopic": topic.subtopic,
-                "title": topic.title,
-                "path": str(topic.source_path),
-                "priority": topic.priority,
-                "estimated_weight": topic.estimated_weight,
-                "mastery": topic_progress.mastery,
-                "forgetting_risk": topic_progress.forgetting_risk,
-                "generated_cards": topic_progress.generated_cards,
-                "generated_quiz_items": topic_progress.generated_quiz_items,
-                "target_cards": estimate_target_cards(topic.title, topic.body),
-                "target_questions": estimate_target_questions(topic.title, topic.body),
-                "score": score_topic(topic, topic_progress, plan.days_left),
-            }
-        )
+        item = {
+            "id": topic.id,
+            "content_type": topic.content_type,
+            "subject": topic.subject,
+            "topic": topic.topic,
+            "subtopic": topic.subtopic,
+            "title": topic.title,
+            "path": str(topic.source_path),
+            "priority": topic.priority,
+            "estimated_weight": topic.estimated_weight,
+            "mastery": topic_progress.mastery,
+            "forgetting_risk": topic_progress.forgetting_risk,
+            "generated_cards": topic_progress.generated_cards,
+            "generated_quiz_items": topic_progress.generated_quiz_items,
+            "target_cards": estimate_target_cards(topic.title, topic.body),
+            "target_questions": estimate_target_questions(topic.title, topic.body),
+            "score": score_topic(topic, topic_progress, plan.days_left),
+        }
+        if topic.content_type == "practical":
+            practical_rows.append(item)
+        else:
+            topic_rows.append(item)
     topic_rows.sort(key=lambda item: item["score"], reverse=True)
+    practical_rows.sort(key=lambda item: item["score"], reverse=True)
     session_targets = calculate_session_targets(
         plan.days_left, plan.phase, len(cards), len(questions)
     )
@@ -109,10 +120,12 @@ def build_dashboard_data(
         "days_left": plan.days_left,
         "phase": plan.phase,
         "today_plan_markdown": plan.to_markdown(),
-        "topic_count": len(topics),
+        "topic_count": len(theory_topics),
+        "practical_count": len(practical_topics),
         "card_count": len(cards),
         "question_count": len(questions),
         "topics": topic_rows,
+        "practicals": practical_rows,
         "review_topics": [_topic_score_to_dict(item) for item in plan.review_topics],
         "weak_topics": [_topic_score_to_dict(item) for item in plan.weak_topics],
         "new_topics": [_topic_score_to_dict(item) for item in plan.new_topics],
@@ -148,7 +161,7 @@ def _topic_score_to_dict(item) -> dict:
 
 
 def find_topic(topic_id: str, root: Path | None = None):
-    _, settings, topics, progress, cards, questions, _, _ = load_runtime(root)
+    _, settings, topics, _, _, progress, cards, questions, _, _ = load_runtime(root)
     for topic in topics:
         if topic.id == topic_id:
             topic_progress = progress[topic.id]

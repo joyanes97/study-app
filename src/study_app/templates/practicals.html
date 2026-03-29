@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="list-header">
+  <div>
+    <p class="eyebrow">Modulo independiente</p>
+    <h1>Supuestos practicos</h1>
+  </div>
+  <p class="lead">Este espacio separa la preparacion practica de la teoria para no contaminar la memoria factual con casos operativos.</p>
+</section>
+<section class="topics-grid">
+  {% for topic in data.practicals %}
+  <article class="topic-card">
+    <div class="topic-card-head">
+      <span class="badge">practico</span>
+      <span class="score">{{ '%.2f'|format(topic.score) }}</span>
+    </div>
+    <h2><a href="/topics/{{ topic.id }}">{{ topic.title }}</a></h2>
+    <p>{{ topic.subtopic }}</p>
+    <dl>
+      <div><dt>Tarjetas</dt><dd>{{ topic.generated_cards }}/{{ topic.target_cards }}</dd></div>
+      <div><dt>Test</dt><dd>{{ topic.generated_quiz_items }}/{{ topic.target_questions }}</dd></div>
+      <div><dt>Dominio</dt><dd>{{ '%.2f'|format(topic.mastery) }}</dd></div>
+      <div><dt>Riesgo</dt><dd>{{ '%.2f'|format(topic.forgetting_risk) }}</dd></div>
+    </dl>
+  </article>
+  {% else %}
+  <article class="panel"><p>No hay supuestos practicos activos.</p></article>
+  {% endfor %}
+</section>
+{% endblock %}
