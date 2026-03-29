@@ -520,6 +520,7 @@ def evaluate_practical_submission(
         "infracción",
     ]
     case_terms = []
+    rubric = []
     if practical_case:
         case_terms.extend(_extract_case_terms(practical_case.get("facts", "")))
         case_terms.extend(
@@ -528,6 +529,7 @@ def evaluate_practical_submission(
         case_terms.extend(
             _extract_case_terms(" ".join(practical_case.get("police_action", [])))
         )
+        rubric = build_practical_rubric(practical_case)
     keyword_hits = sum(1 for word in keywords if word in lowered)
     case_hits = sum(1 for term in case_terms if term in lowered)
     length_score = min(len(text) / 1800, 1.0)
@@ -552,6 +554,15 @@ def evaluate_practical_submission(
         f"ajuste al caso {'alto' if case_score > 0.6 else 'mejorable'} y "
         f"estructura {'clara' if structure_score > 0.8 else 'mejorable'}."
     )
+    if rubric:
+        rubric_feedback = []
+        for item in rubric:
+            criterion_terms = _extract_case_terms(item["criterion"])
+            covered = any(term in lowered for term in criterion_terms)
+            rubric_feedback.append(
+                f"{item['criterion']}: {'cubierto' if covered else 'débil'}"
+            )
+        feedback += " Rúbrica: " + "; ".join(rubric_feedback) + "."
     return score, feedback
 
 

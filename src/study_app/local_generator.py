@@ -280,6 +280,11 @@ def _generate_practical_quiz(topic: Topic, target: int) -> dict:
                         {"text": wrongs[1], "isCorrect": False},
                         {"text": wrongs[2], "isCorrect": False},
                     ],
+                    "optionExplanations": _build_option_explanations(
+                        correct,
+                        wrongs,
+                        f"La primera actuación correcta es '{correct}'.",
+                    ),
                 }
             )
         if case.get("documents"):
@@ -298,6 +303,9 @@ def _generate_practical_quiz(topic: Topic, target: int) -> dict:
                         {"text": wrongs[1], "isCorrect": False},
                         {"text": wrongs[2], "isCorrect": False},
                     ],
+                    "optionExplanations": _build_option_explanations(
+                        correct, wrongs, f"La diligencia correcta es '{correct}'."
+                    ),
                 }
             )
     if not questions:
@@ -524,12 +532,16 @@ def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
     return {
         "question": f"En el {topic_title}, ¿qué regulan conjuntamente {fact['law']} y {fact['support_law']}?",
         "hint": fact["text"],
+        "explanation": f"La respuesta correcta es '{correct}' porque es la materia atribuida en el temario a esas dos normas.",
         "answerOptions": [
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
             {"text": wrongs[2], "isCorrect": False},
         ],
+        "optionExplanations": _build_option_explanations(
+            correct, wrongs, f"El temario vincula estas normas con '{correct}'."
+        ),
     }
 
 
@@ -557,12 +569,16 @@ def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
     return {
         "question": stem,
         "hint": fact["text"],
+        "explanation": f"La norma {fact['law']} se asocia en el temario con '{correct}'.",
         "answerOptions": [
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
             {"text": wrongs[2], "isCorrect": False},
         ],
+        "optionExplanations": _build_option_explanations(
+            correct, wrongs, f"La norma {fact['law']} regula '{correct}'."
+        ),
     }
 
 
@@ -580,12 +596,16 @@ def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
     return {
         "question": f"¿Qué regula el artículo {fact['article']} según el {topic_title}?",
         "hint": fact["text"],
+        "explanation": f"El artículo {fact['article']} regula '{correct}' en el temario.",
         "answerOptions": [
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
             {"text": wrongs[2], "isCorrect": False},
         ],
+        "optionExplanations": _build_option_explanations(
+            correct, wrongs, f"El artículo {fact['article']} se refiere a '{correct}'."
+        ),
     }
 
 
@@ -603,12 +623,16 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
     return {
         "question": f"¿Qué afirmación corresponde al punto {fact['label']} del {topic_title}?",
         "hint": fact["text"],
+        "explanation": f"El punto {fact['label']} del temario contiene '{correct}'.",
         "answerOptions": [
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
             {"text": wrongs[2], "isCorrect": False},
         ],
+        "optionExplanations": _build_option_explanations(
+            correct, wrongs, f"El punto {fact['label']} recoge '{correct}'."
+        ),
     }
 
 
@@ -638,12 +662,18 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
     return {
         "question": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
         "hint": fact["text"],
+        "explanation": f"La formulación correcta reproduce la idea central del temario sobre '{_generic_focus(fact['text'])}'.",
         "answerOptions": [
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
             {"text": wrongs[2], "isCorrect": False},
         ],
+        "optionExplanations": _build_option_explanations(
+            correct,
+            wrongs,
+            "Solo una opción refleja la idea central del tema; las demás pertenecen a otros apartados.",
+        ),
     }
 
 
@@ -672,6 +702,17 @@ def _generic_focus(text: str) -> str:
     if len(words) > 10:
         cleaned = " ".join(words[:10]) + "..."
     return cleaned
+
+
+def _build_option_explanations(
+    correct: str, wrongs: list[str], correct_reason: str
+) -> dict[str, str]:
+    explanations = {correct: correct_reason}
+    for wrong in wrongs:
+        explanations[wrong] = (
+            f"'{wrong}' no corresponde a esta pregunta; pertenece a otro apartado o a otra norma del mismo bloque."
+        )
+    return explanations
 
 
 def _normalize_theory_lines(body: str) -> list[str]:

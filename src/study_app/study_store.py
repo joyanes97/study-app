@@ -212,6 +212,7 @@ def sync_generated_artifacts(
                 "option_explanations": _option_explanations(
                     options,
                     question.get("hint") or question.get("explanation") or "",
+                    question.get("optionExplanations") or {},
                 ),
                 "source_file": path.name,
             }
@@ -223,16 +224,22 @@ def sync_generated_artifacts(
     return cards, questions
 
 
-def _option_explanations(options: list[dict], explanation: str) -> dict[str, str]:
+def _option_explanations(
+    options: list[dict], explanation: str, provided: dict[str, str]
+) -> dict[str, str]:
     correct_text = "La opcion correcta coincide con el contenido del tema."
     wrong_text = (
         explanation.strip()
         or "Este distractor no se ajusta al punto principal que aparece en el temario."
     )
-    return {
-        option["id"]: (correct_text if option["is_correct"] else wrong_text)
-        for option in options
-    }
+    output = {}
+    for option in options:
+        text = option["text"]
+        if text in provided:
+            output[option["id"]] = provided[text]
+        else:
+            output[option["id"]] = correct_text if option["is_correct"] else wrong_text
+    return output
 
 
 def ensure_daily_session(
