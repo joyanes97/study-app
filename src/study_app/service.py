@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+import uuid
 
 from study_app.markdown_loader import load_topics
 from study_app.scheduler import build_daily_plan, score_topic
@@ -13,8 +14,10 @@ from study_app.study_store import (
     load_card_reviews,
     load_cards,
     load_daily_sessions,
+    load_mock_exams,
     load_question_attempts,
     load_questions,
+    save_mock_exams,
     sync_generated_artifacts,
     update_daily_session_completion,
 )
@@ -392,6 +395,118 @@ def progress_summary(root: Path | None = None) -> dict:
         "sessions": sessions,
         "automation_report": data["automation_report"],
     }
+
+
+def build_mock_exam_data(root: Path | None = None) -> dict:
+    data = build_dashboard_data(root, date.today())
+    theory_questions = [
+        q for q in data["today_questions"] if q.get("content_type") == "theory"
+    ]
+    practical_questions = [
+        q for q in data["today_questions"] if q.get("content_type") == "practical"
+    ]
+    return {
+        "exam_date": data["exam_date"],
+        "days_left": data["days_left"],
+        "theory_questions": theory_questions[:20],
+        "practicals": data["practicals"][:1],
+        "time_limit_minutes": 180,
+    }
+
+
+def score_mock_exam(
+    root: Path | None,
+    answers: dict[str, str],
+    practical_text: str,
+) -> dict:
+    root = root or get_root()
+    data = build_dashboard_data(root, date.today())
+    theory_questions = [
+        q for q in data["today_questions"] if q.get("content_type") == "theory"
+    ][:20]
+    correct = 0
+    wrong = 0
+    blank = 0
+    for question in theory_questions:
+        answer = answers.get(question["id"], "")
+        if not answer:
+            blank += 1
+            continue
+        correct_option = next(
+            (opt for opt in question["options"] if opt["is_correct"]), None
+        )
+        if correct_option and correct_option["id"] == answer:
+            correct += 1
+        else:
+            wrong += 1
+
+    total_questions = max(len(theory_questions), 1)
+    raw_score = max(0.0, correct - (wrong / 2))
+    part_a_score = round((raw_score / total_questions) * 10, 2)
+    part_a_passed = part_a_score >= 5.0
+
+    practical_score = 0.0
+    practical_feedback = "No evaluado porque la Parte A no alcanzó 5.0."
+    if part_a_passed:
+        practical_score, practical_feedback = evaluate_practical_submission(
+            practical_text
+        )
+
+    final_score = (
+        round((part_a_score + practical_score) / 2, 2)
+        if part_a_passed
+        else round(part_a_score, 2)
+    )
+    passed = part_a_passed and practical_score >= 5.0
+
+    record = {
+        "id": str(uuid.uuid4()),
+        "created_at": datetime.now().isoformat(),
+        "part_a_score": part_a_score,
+        "part_b_score": practical_score,
+        "final_score": final_score,
+        "passed": passed,
+        "correct": correct,
+        "wrong": wrong,
+        "blank": blank,
+        "practical_feedback": practical_feedback,
+    }
+    state_dir = root / "data" / "state"
+    history = load_mock_exams(state_dir)
+    history.insert(0, record)
+    save_mock_exams(state_dir, history)
+    return record
+
+
+def evaluate_practical_submission(practical_text: str) -> tuple[float, str]:
+    text = practical_text.strip()
+    if not text:
+        return 0.0, "No se ha entregado desarrollo del supuesto práctico."
+
+    lowered = text.lower()
+    keywords = [
+        "actuación",
+        "diligencia",
+        "fundamento",
+        "norma",
+        "policía",
+        "intervención",
+        "denuncia",
+        "infracción",
+    ]
+    keyword_hits = sum(1 for word in keywords if word in lowered)
+    length_score = min(len(text) / 1800, 1.0)
+    keyword_score = min(keyword_hits / 5, 1.0)
+    structure_score = 1.0 if ("1." in text or "- " in text or "•" in text) else 0.5
+    score = round(
+        min(10.0, (length_score * 4 + keyword_score * 4 + structure_score * 2)), 2
+    )
+    feedback = (
+        f"Desarrollo con longitud {'adecuada' if length_score > 0.6 else 'mejorable'}, "
+        f"cobertura jurídica {'sólida' if keyword_score > 0.6 else 'limitada'} y "
+        f"estructura {'clara' if structure_score > 0.8 else 'mejorable'}."
+    )
+    return score, feedback
 
 
 def update_exam_date(root: Path | None, new_exam_date: date) -> Path:

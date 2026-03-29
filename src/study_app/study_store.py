@@ -137,6 +137,14 @@ def save_notification_state(state_dir: Path, payload: dict) -> Path:
     return write_json(_path(state_dir, "notification_state.json"), payload)
 
 
+def load_mock_exams(state_dir: Path) -> list[dict]:
+    return read_json(_path(state_dir, "mock_exams.json"), [])
+
+
+def save_mock_exams(state_dir: Path, payload: list[dict]) -> Path:
+    return write_json(_path(state_dir, "mock_exams.json"), payload)
+
+
 def topic_source_hash(topic: Topic) -> str:
     raw = topic.body.encode("utf-8")
     return hashlib.sha1(raw).hexdigest()

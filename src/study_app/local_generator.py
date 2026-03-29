@@ -77,9 +77,9 @@ def _quiz_prompt(topic: Topic, target: int) -> str:
     source = topic.body[:1600]
     return (
         f"Genera exactamente {target} preguntas tipo test para el tema '{topic.title}'. "
-        "Cada pregunta debe tener 3 opciones: 1 correcta y 2 distractores plausibles. "
+        "Cada pregunta debe tener 4 opciones: 1 correcta y 3 distractores plausibles. "
         "Devuelve solo texto con este formato repetido:\n"
-        "Q: pregunta\nA: correcta\nB: distractor\nC: distractor\nEXPL: explicacion breve\n---\n"
+        "Q: pregunta\nA: correcta\nB: distractor\nC: distractor\nD: distractor\nEXPL: explicacion breve\n---\n"
         "Prioriza datos normativos y conceptos nucleares.\n\n"
         f"Contenido fuente:\n\n{source}"
     )
@@ -130,16 +130,19 @@ def _parse_quiz(raw: str, title: str) -> dict:
         correct = _field(block, "A")
         wrong1 = _field(block, "B")
         wrong2 = _field(block, "C")
+        wrong3 = _field(block, "D")
         expl = _field(block, "EXPL")
-        if question and correct and wrong1 and wrong2:
+        if question and correct and wrong1 and wrong2 and wrong3:
             questions.append(
                 {
                     "question": question,
                     "hint": expl,
+                    "explanation": expl,
                     "answerOptions": [
                         {"text": correct, "isCorrect": True},
                         {"text": wrong1, "isCorrect": False},
                         {"text": wrong2, "isCorrect": False},
+                        {"text": wrong3, "isCorrect": False},
                     ],
                 }
             )
@@ -356,9 +359,9 @@ def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
         text = f"{candidate['law']}. {candidate['concept']}"
         if text != correct and text not in wrongs:
             wrongs.append(text)
-        if len(wrongs) == 2:
+        if len(wrongs) == 3:
             break
-    while len(wrongs) < 2:
+    while len(wrongs) < 3:
         wrongs.append(f"Norma distinta del {topic_title}")
     stem = f"En el {topic_title}, ¿qué opción corresponde mejor" + (
         f" al artículo {fact['article']}?" if fact.get("article") else " al temario?"
@@ -370,6 +373,7 @@ def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
         ],
     }
 
@@ -381,9 +385,9 @@ def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
         text = candidate["concept"]
         if text != correct and text not in wrongs:
             wrongs.append(text)
-        if len(wrongs) == 2:
+        if len(wrongs) == 3:
             break
-    while len(wrongs) < 2:
+    while len(wrongs) < 3:
         wrongs.append(f"Contenido distinto del {topic_title}")
     return {
         "question": f"¿Qué regula el artículo {fact['article']} según el {topic_title}?",
@@ -392,6 +396,7 @@ def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
         ],
     }
 
@@ -403,9 +408,9 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
         text = candidate["concept"]
         if text != correct and text not in wrongs:
             wrongs.append(text)
-        if len(wrongs) == 2:
+        if len(wrongs) == 3:
             break
-    while len(wrongs) < 2:
+    while len(wrongs) < 3:
         wrongs.append(f"Dato distinto del {topic_title}")
     return {
         "question": f"¿Qué afirmación corresponde al punto {fact['label']} del {topic_title}?",
@@ -414,6 +419,7 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
         ],
     }
 
@@ -428,11 +434,11 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
             )
             if text and text != correct and text not in wrongs:
                 wrongs.append(text)
-            if len(wrongs) == 2:
+            if len(wrongs) == 3:
                 break
-        if len(wrongs) == 2:
+        if len(wrongs) == 3:
             break
-    while len(wrongs) < 2:
+    while len(wrongs) < 3:
         wrongs.append(f"Contenido no ajustado al {topic_title}")
     return {
         "question": f"Según el {topic_title}, ¿cuál de las siguientes afirmaciones se ajusta mejor al temario?",
@@ -441,6 +447,7 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
             {"text": correct, "isCorrect": True},
             {"text": wrongs[0], "isCorrect": False},
             {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
         ],
     }
 

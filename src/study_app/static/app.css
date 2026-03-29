@@ -200,6 +200,23 @@ h2 { font-size: 1.3rem; }
 .quiz-option input { accent-color: var(--accent); }
 .feedback-panel.success { border-color: #a9c59f; background: #f3fbef; }
 .feedback-panel.warning { border-color: #dca37e; background: #fff3ea; }
+.mock-question-block {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.mock-textarea {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffaf3;
+  color: var(--ink);
+  padding: 1rem;
+  font: inherit;
+  resize: vertical;
+}
 .markdown-body { line-height: 1.72; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 1.1rem 0 0.5rem; font-size: 1.4rem; }
 .markdown-body p, .markdown-body li { color: #2c241f; }

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Examen real</p>
+    <h1>Simulacro con penalizacion y caso practico</h1>
+    <p class="lead">Replica las condiciones del tribunal: test con penalizacion y desarrollo practico dentro de un tiempo maximo de 3 horas.</p>
+  </div>
+  <div class="stats-grid">
+    <article class="stat-card accent"><span>Tiempo limite</span><strong>{{ data.time_limit_minutes }} min</strong></article>
+    <article class="stat-card"><span>Parte A</span><strong>{{ data.theory_questions|length }} preguntas</strong></article>
+    <article class="stat-card"><span>Parte B</span><strong>{{ data.practicals|length }} caso</strong></article>
+    <article class="stat-card"><span>Dias restantes</span><strong>{{ data.days_left }}</strong></article>
+  </div>
+</section>
+
+{% if result %}
+<article class="panel panel-wide feedback-panel {{ 'success' if result.passed else 'warning' }}">
+  <div class="panel-head"><h2>Resultado del simulacro</h2></div>
+  <ul class="action-list compact-list">
+    <li>Parte A: {{ result.part_a_score }}/10</li>
+    <li>Parte B: {{ result.part_b_score }}/10</li>
+    <li>Final: {{ result.final_score }}/10</li>
+    <li>Estado: {{ 'Apto' if result.passed else 'No apto' }}</li>
+    <li>Aciertos: {{ result.correct }} | Fallos: {{ result.wrong }} | Blancas: {{ result.blank }}</li>
+    <li>{{ result.practical_feedback }}</li>
+  </ul>
+</article>
+{% endif %}
+
+<form method="post" action="/mock-exam" class="content-grid">
+  <article class="panel panel-wide">
+    <div class="panel-head"><h2>Parte A · Test con penalizacion</h2></div>
+    <p class="note">Cada 2 fallos restan 1 acierto. Debes alcanzar 5.0 para pasar a la parte B.</p>
+    {% for question in data.theory_questions %}
+    <section class="mock-question-block">
+      <h3>{{ loop.index }}. {{ question.question }}</h3>
+      {% for option in question.options %}
+      <label class="quiz-option">
+        <input type="radio" name="answer_{{ question.id }}" value="{{ option.id }}">
+        <span>{{ option.text }}</span>
+      </label>
+      {% endfor %}
+    </section>
+    {% endfor %}
+  </article>
+
+  <aside class="panel">
+    <div class="panel-head"><h2>Parte B · Desarrollo</h2></div>
+    {% if data.practicals %}
+    <p><strong>{{ data.practicals[0].title }}</strong></p>
+    <p class="note">Redacta una actuacion policial estructurada, con fundamento juridico, diligencias y resolucion final.</p>
+    <textarea name="practical_text" class="mock-textarea" placeholder="Desarrolla aqui el caso practico..."></textarea>
+    {% else %}
+    <p>No hay practicos cargados.</p>
+    {% endif %}
+    <button type="submit">Corregir simulacro</button>
+  </aside>
+</form>
+{% endblock %}

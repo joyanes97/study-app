@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from study_app.service import (
     build_dashboard_data,
+    build_mock_exam_data,
     find_topic,
     get_root,
     mark_session_item_complete,
@@ -18,6 +19,7 @@ from study_app.service import (
     next_question,
     next_session_item,
     progress_summary,
+    score_mock_exam,
     update_exam_date,
 )
 from study_app.study_store import (
@@ -123,6 +125,40 @@ def study_session(request: Request):
             "data": data,
             "current_item": current_item,
             "shown_at": datetime.now().isoformat(),
+        },
+    )
+
+
+@app.get("/mock-exam", response_class=HTMLResponse)
+def mock_exam(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request,
+        "mock_exam.html",
+        {
+            "request": request,
+            "page_title": "Simulacro",
+            "data": build_mock_exam_data(ROOT),
+            "result": None,
+        },
+    )
+
+
+@app.post("/mock-exam", response_class=HTMLResponse)
+async def submit_mock_exam(request: Request):
+    form = await request.form()
+    answers = {
+        key[7:]: value for key, value in form.items() if key.startswith("answer_")
+    }
+    practical_text = str(form.get("practical_text", ""))
+    result = score_mock_exam(ROOT, answers, practical_text)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "mock_exam.html",
+        {
+            "request": request,
+            "page_title": "Simulacro",
+            "data": build_mock_exam_data(ROOT),
+            "result": result,
         },
     )
 
