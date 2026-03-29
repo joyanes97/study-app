@@ -324,13 +324,34 @@ def _practical_distractors(case: dict, correct: str) -> list[str]:
 
 
 def _build_facts(topic: Topic) -> list[dict]:
-    lines = [line.strip() for line in topic.body.splitlines() if line.strip()]
+    lines = _normalize_theory_lines(topic.body)
     facts = []
     for line in lines:
         if line.startswith("#"):
             continue
-        cleaned = line.lstrip("•➢❖✓- ").strip()
+        cleaned = line.lstrip("•➢❖✓-⎯▪o ").strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
         if len(cleaned) < 8:
+            continue
+
+        if _is_heading_noise(cleaned):
+            continue
+
+        paired_laws = re.match(
+            r"((?:DECRETO|ORDEN|LEY|LO|RD|RDL)\s+[0-9/]+[^.]*?)\s+Y\s+((?:ORDEN|DECRETO|LEY|LO|RD|RDL)\s+[0-9/]+[^.]*?)\.\s*(.+)",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        if paired_laws:
+            facts.append(
+                {
+                    "kind": "law_pair",
+                    "law": paired_laws.group(1).strip(" ."),
+                    "support_law": paired_laws.group(2).strip(" ."),
+                    "concept": paired_laws.group(3).strip(" ."),
+                    "text": cleaned,
+                }
+            )
             continue
 
         article_match = re.search(
@@ -393,6 +414,18 @@ def _build_facts(topic: Topic) -> list[dict]:
             )
             continue
 
+        split_match = re.match(r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+)\.\s+(.+)", cleaned)
+        if split_match and len(split_match.group(1).split()) <= 8:
+            facts.append(
+                {
+                    "kind": "headline_fact",
+                    "headline": split_match.group(1).title(),
+                    "concept": split_match.group(2).strip(),
+                    "text": cleaned,
+                }
+            )
+            continue
+
         if len(cleaned) >= 20:
             facts.append({"kind": "generic", "text": cleaned})
 
@@ -409,6 +442,11 @@ def _build_facts(topic: Topic) -> list[dict]:
 
 def _card_from_fact(topic_title: str, fact: dict) -> dict:
     kind = fact.get("kind")
+    if kind == "law_pair":
+        return {
+            "front": f"En el {topic_title}, ¿qué regulan conjuntamente {fact['law']} y {fact['support_law']}?",
+            "back": fact["concept"],
+        }
     if kind == "law":
         if fact.get("article"):
             return {
@@ -429,18 +467,26 @@ def _card_from_fact(topic_title: str, fact: dict) -> dict:
             "front": f"¿Qué dato clave corresponde al punto {fact['label']} del {topic_title}?",
             "back": fact["concept"],
         }
-    prompts = cycle(
-        [
-            f"Resume la idea clave de este punto del {topic_title}.",
-            f"¿Qué debes recordar del {topic_title} para el examen?",
-            f"¿Cuál es el dato normativo o conceptual esencial de {topic_title}?",
-        ]
-    )
-    return {"front": next(prompts), "back": fact["text"]}
+    if kind == "headline_fact":
+        return {
+            "front": f"En el {topic_title}, ¿qué establece el apartado '{fact['headline']}'?",
+            "back": fact["concept"],
+        }
+    return {
+        "front": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
+        "back": fact["text"],
+    }
 
 
 def _build_distractor_pools(facts: list[dict]) -> dict:
-    pools = {"law": [], "article_title": [], "enumeration": [], "generic": []}
+    pools = {
+        "law": [],
+        "law_pair": [],
+        "article_title": [],
+        "enumeration": [],
+        "headline_fact": [],
+        "generic": [],
+    }
     for fact in facts:
         pools.setdefault(fact["kind"], []).append(fact)
     return pools
@@ -448,6 +494,8 @@ def _build_distractor_pools(facts: list[dict]) -> dict:
 
 def _quiz_from_fact(topic_title: str, fact: dict, pools: dict) -> dict:
     kind = fact.get("kind")
+    if kind == "law_pair":
+        return _quiz_from_law_pair(topic_title, fact, pools)
     if kind == "law":
         return _quiz_from_law(topic_title, fact, pools)
     if kind == "article_title":
@@ -457,19 +505,54 @@ def _quiz_from_fact(topic_title: str, fact: dict, pools: dict) -> dict:
     return _quiz_from_generic(topic_title, fact, pools)
 
 
-def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = f"{fact['law']}. {fact['concept']}"
+def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
+    correct = fact["concept"]
     wrongs = []
-    for candidate in pools.get("law", []):
-        text = f"{candidate['law']}. {candidate['concept']}"
-        if text != correct and text not in wrongs:
-            wrongs.append(text)
+    for kind in ("law_pair", "law", "headline_fact", "generic"):
+        for candidate in pools.get(kind, []):
+            text = candidate.get("concept") or _short_answer_text(
+                candidate.get("text", "")
+            )
+            if text and text != correct and text not in wrongs:
+                wrongs.append(text)
+            if len(wrongs) == 3:
+                break
         if len(wrongs) == 3:
             break
     while len(wrongs) < 3:
-        wrongs.append(f"Norma distinta del {topic_title}")
-    stem = f"En el {topic_title}, ¿qué opción corresponde mejor" + (
-        f" al artículo {fact['article']}?" if fact.get("article") else " al temario?"
+        wrongs.append(f"Materia distinta del {topic_title}")
+    return {
+        "question": f"En el {topic_title}, ¿qué regulan conjuntamente {fact['law']} y {fact['support_law']}?",
+        "hint": fact["text"],
+        "answerOptions": [
+            {"text": correct, "isCorrect": True},
+            {"text": wrongs[0], "isCorrect": False},
+            {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
+        ],
+    }
+
+
+def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
+    correct = fact["concept"]
+    wrongs = []
+    for kind in ("law", "law_pair", "headline_fact", "generic"):
+        for candidate in pools.get(kind, []):
+            text = candidate.get("concept") or _short_answer_text(
+                candidate.get("text", "")
+            )
+            if text != correct and text not in wrongs:
+                wrongs.append(text)
+            if len(wrongs) == 3:
+                break
+        if len(wrongs) == 3:
+            break
+    while len(wrongs) < 3:
+        wrongs.append(f"Materia distinta del {topic_title}")
+    stem = f"En el {topic_title}, ¿qué regula la norma {fact['law']}" + (
+        f" en relación con el artículo {fact['article']}?"
+        if fact.get("article")
+        else "?"
     )
     return {
         "question": stem,
@@ -532,10 +615,17 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
 def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
     correct = _short_answer_text(fact["text"])
     wrongs = []
-    for kind in ("generic", "enumeration", "article_title", "law"):
+    for kind in (
+        "headline_fact",
+        "generic",
+        "enumeration",
+        "article_title",
+        "law",
+        "law_pair",
+    ):
         for candidate in pools.get(kind, []):
             text = _short_answer_text(
-                candidate.get("text") or candidate.get("concept", "")
+                candidate.get("concept") or candidate.get("text", "")
             )
             if text and text != correct and text not in wrongs:
                 wrongs.append(text)
@@ -546,7 +636,7 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
     while len(wrongs) < 3:
         wrongs.append(f"Contenido no ajustado al {topic_title}")
     return {
-        "question": f"Según el {topic_title}, ¿cuál de las siguientes afirmaciones se ajusta mejor al temario?",
+        "question": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
         "hint": fact["text"],
         "answerOptions": [
             {"text": correct, "isCorrect": True},
@@ -573,3 +663,60 @@ def _short_answer_text(text: str) -> str:
     if len(value) > 140:
         value = value[:137].rstrip() + "..."
     return value
+
+
+def _generic_focus(text: str) -> str:
+    cleaned = _short_answer_text(text)
+    cleaned = cleaned.split(".")[0].strip()
+    words = cleaned.split()
+    if len(words) > 10:
+        cleaned = " ".join(words[:10]) + "..."
+    return cleaned
+
+
+def _normalize_theory_lines(body: str) -> list[str]:
+    raw_lines = [line.strip() for line in body.splitlines() if line.strip()]
+    merged: list[str] = []
+    for line in raw_lines:
+        if _should_attach_to_previous(line, merged[-1] if merged else ""):
+            merged[-1] = f"{merged[-1].rstrip()} {line.lstrip()}"
+        else:
+            merged.append(line)
+    return merged
+
+
+def _should_attach_to_previous(line: str, previous: str) -> bool:
+    if not previous:
+        return False
+    if re.match(
+        r"^(ART[ÍI]?C?U?L?O?|CAP[IÍ]TULO|T[IÍ]TULO|[A-ZÁÉÍÓÚÑ0-9].*:)",
+        line,
+        flags=re.IGNORECASE,
+    ):
+        return False
+    if line.startswith(("•", "-", "⎯", "✓", "❖", "➢")):
+        return False
+    if line[:1].islower() or line[:1].isdigit():
+        return True
+    if previous.endswith((",", ";", ":")):
+        return True
+    return False
+
+
+def _is_heading_noise(text: str) -> bool:
+    upper = text.upper().strip(" .")
+    if re.match(r"^BLOQUE\s+\d+", upper):
+        return True
+    if re.match(r"^TEMA\s+[0-9\sYALDEL.]+$", upper):
+        return True
+    if upper in {
+        "FUERZAS Y CUERPOS",
+        "DE SEGURIDAD.",
+        "FUERZAS Y CUERPOS DE SEGURIDAD.",
+        "TÍTULO 5.",
+        "TÍTULO 4. RÉGIMEN ESTATUTARIO.",
+    }:
+        return True
+    if text.isupper() and len(text.split()) <= 8 and not re.search(r"\d", text):
+        return True
+    return False
