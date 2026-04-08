@@ -447,7 +447,7 @@ def _build_facts(topic: Topic) -> list[dict]:
             )
             continue
 
-        if len(cleaned) >= 20:
+        if len(cleaned) >= 20 and _is_memorizable_generic(cleaned):
             facts.append({"kind": "generic", "text": cleaned})
 
     dedup = []
@@ -531,8 +531,8 @@ def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
     wrongs = []
     for kind in ("law_pair", "law", "headline_fact", "generic"):
         for candidate in pools.get(kind, []):
-            text = candidate.get("concept") or _short_answer_text(
-                candidate.get("text", "")
+            text = _compress_concept(
+                candidate.get("concept") or candidate.get("text", "")
             )
             if text and text != correct and text not in wrongs:
                 wrongs.append(text)
@@ -563,8 +563,8 @@ def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
     wrongs = []
     for kind in ("law", "law_pair", "headline_fact", "generic"):
         for candidate in pools.get(kind, []):
-            text = candidate.get("concept") or _short_answer_text(
-                candidate.get("text", "")
+            text = _compress_concept(
+                candidate.get("concept") or candidate.get("text", "")
             )
             if text != correct and text not in wrongs:
                 wrongs.append(text)
@@ -599,7 +599,7 @@ def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
     correct = _compress_concept(fact["concept"])
     wrongs = []
     for candidate in pools.get("article_title", []):
-        text = candidate["concept"]
+        text = _compress_concept(candidate["concept"])
         if text != correct and text not in wrongs:
             wrongs.append(text)
         if len(wrongs) == 3:
@@ -626,7 +626,7 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
     correct = _compress_concept(fact["concept"])
     wrongs = []
     for candidate in pools.get("enumeration", []):
-        text = candidate["concept"]
+        text = _compress_concept(candidate["concept"])
         if text != correct and text not in wrongs:
             wrongs.append(text)
         if len(wrongs) == 3:
@@ -661,7 +661,7 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
         "law_pair",
     ):
         for candidate in pools.get(kind, []):
-            text = _short_answer_text(
+            text = _compress_concept(
                 candidate.get("concept") or candidate.get("text", "")
             )
             if text and text != correct and text not in wrongs:
@@ -719,6 +719,47 @@ def _compress_concept(text: str) -> str:
     if len(value) > 110:
         value = value[:107].rstrip() + "..."
     return value or _short_answer_text(text)
+
+
+def _is_memorizable_generic(text: str) -> bool:
+    lower = text.lower()
+    if len(text.split()) < 6:
+        return False
+    if lower.endswith(
+        (
+            "en especial",
+            "y en especial",
+            "similares",
+            "hostelería",
+            "objeto",
+            "exclusiones",
+        )
+    ):
+        return False
+    signal_terms = [
+        "es ",
+        "son ",
+        "será ",
+        "serán ",
+        "debe ",
+        "deben ",
+        "podrá ",
+        "podrán ",
+        "deberá ",
+        "deberán ",
+        "corresponde",
+        "comprende",
+        "incluye",
+        "consiste",
+        "realiza",
+        "resolverá",
+        "velará",
+        "permitirá",
+        "prohíbe",
+        "prohibe",
+        "será ",
+    ]
+    return any(term in lower for term in signal_terms)
 
 
 def _generic_focus(text: str) -> str:
