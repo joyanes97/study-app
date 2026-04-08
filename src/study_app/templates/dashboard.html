@@ -113,6 +113,19 @@
     </ul>
   </article>
 
+  <article class="panel">
+    <div class="panel-head">
+      <h2>Ajuste desde ayer</h2>
+    </div>
+    <ul class="action-list">
+      <li>Completado ayer: {{ '%.0f'|format(data.yesterday_signals.completion_ratio * 100) }}%</li>
+      <li>Fallos ayer: {{ data.yesterday_signals.incorrect_count }}</li>
+      <li>Baja confianza ayer: {{ data.yesterday_signals.low_confidence_count }}</li>
+      <li>Arrastre hoy: {{ data.yesterday_signals.carryover_cards|length + data.yesterday_signals.carryover_questions|length }}</li>
+    </ul>
+    <p class="note">La cuota de hoy cambia segun lo que dejaste pendiente, lo que fallaste y la cercania del examen.</p>
+  </article>
+
   <article class="panel panel-wide">
     <div class="panel-head">
       <h2>Temas más prioritarios</h2>
