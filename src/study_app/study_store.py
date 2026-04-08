@@ -6,6 +6,7 @@ from pathlib import Path
 
 from study_app.json_store import read_json, write_json
 from study_app.models import Topic
+from study_app.study_sqlite import get_study_store
 from study_app.targets import estimate_target_cards, estimate_target_questions
 
 
@@ -30,118 +31,228 @@ def save_questions(state_dir: Path, questions: list[dict]) -> Path:
 
 
 def load_card_reviews(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "card_reviews.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_mapping("card_reviews", "item_id")
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "card_reviews.json"), {})
+    if payload:
+        store.save_mapping("card_reviews", "item_id", payload)
+    return payload
 
 
 def save_card_reviews(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_mapping("card_reviews", "item_id", payload)
     return write_json(_path(state_dir, "card_reviews.json"), payload)
 
 
 def load_question_attempts(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "question_attempts.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_mapping("question_attempts", "item_id")
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "question_attempts.json"), {})
+    if payload:
+        store.save_mapping("question_attempts", "item_id", payload)
+    return payload
 
 
 def save_question_attempts(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_mapping("question_attempts", "item_id", payload)
     return write_json(_path(state_dir, "question_attempts.json"), payload)
 
 
 def load_attempt_events(state_dir: Path) -> list[dict]:
-    return read_json(_path(state_dir, "attempt_events.json"), [])
+    store = get_study_store(state_dir)
+    payload = store.load_list("attempt_events")
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "attempt_events.json"), [])
+    if payload:
+        store.save_list("attempt_events", payload)
+    return payload
 
 
 def save_attempt_events(state_dir: Path, payload: list[dict]) -> Path:
+    store = get_study_store(state_dir)
+    store.save_list("attempt_events", payload)
     return write_json(_path(state_dir, "attempt_events.json"), payload)
 
 
 def load_source_index(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "source_index.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("source_index", {})
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "source_index.json"), {})
+    if payload:
+        store.save_named_json("source_index", payload)
+    return payload
 
 
 def save_source_index(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("source_index", payload)
     return write_json(_path(state_dir, "source_index.json"), payload)
 
 
 def load_generation_jobs(state_dir: Path) -> list[dict]:
-    return read_json(_path(state_dir, "generation_jobs.json"), [])
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("generation_jobs", [])
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "generation_jobs.json"), [])
+    if payload:
+        store.save_named_json("generation_jobs", payload)
+    return payload
 
 
 def save_generation_jobs(state_dir: Path, jobs: list[dict]) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("generation_jobs", jobs)
     return write_json(_path(state_dir, "generation_jobs.json"), jobs)
 
 
 def load_notebook_map(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "notebooklm_map.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("notebooklm_map", {})
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "notebooklm_map.json"), {})
+    if payload:
+        store.save_named_json("notebooklm_map", payload)
+    return payload
 
 
 def save_notebook_map(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("notebooklm_map", payload)
     return write_json(_path(state_dir, "notebooklm_map.json"), payload)
 
 
 def load_daily_sessions(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "daily_sessions.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_mapping("daily_sessions", "session_date")
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "daily_sessions.json"), {})
+    if payload:
+        store.save_mapping("daily_sessions", "session_date", payload)
+    return payload
 
 
 def save_daily_sessions(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_mapping("daily_sessions", "session_date", payload)
     return write_json(_path(state_dir, "daily_sessions.json"), payload)
 
 
 def load_automation_report(state_dir: Path) -> dict:
-    return read_json(
-        _path(state_dir, "automation_report.json"),
-        {
-            "generated_topics": [],
-            "pending_auth_topics": [],
-            "pending_ocr_topics": [],
-            "new_material_topics": [],
-            "ingested_pdfs": [],
-            "daily_session": {},
-            "needs_reminder": False,
-            "last_run": None,
-            "summary": "",
-        },
-    )
+    default = {
+        "generated_topics": [],
+        "pending_auth_topics": [],
+        "pending_ocr_topics": [],
+        "new_material_topics": [],
+        "ingested_pdfs": [],
+        "daily_session": {},
+        "needs_reminder": False,
+        "last_run": None,
+        "summary": "",
+    }
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("automation_report", default)
+    if payload != default:
+        return payload
+    payload = read_json(_path(state_dir, "automation_report.json"), default)
+    if payload != default:
+        store.save_named_json("automation_report", payload)
+    return payload
 
 
 def save_automation_report(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("automation_report", payload)
     return write_json(_path(state_dir, "automation_report.json"), payload)
 
 
 def load_pdf_ingest_index(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "pdf_ingest_index.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("pdf_ingest_index", {})
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "pdf_ingest_index.json"), {})
+    if payload:
+        store.save_named_json("pdf_ingest_index", payload)
+    return payload
 
 
 def save_pdf_ingest_index(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("pdf_ingest_index", payload)
     return write_json(_path(state_dir, "pdf_ingest_index.json"), payload)
 
 
 def load_reminder_state(state_dir: Path) -> dict:
-    return read_json(_path(state_dir, "reminder_state.json"), {})
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("reminder_state", {})
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "reminder_state.json"), {})
+    if payload:
+        store.save_named_json("reminder_state", payload)
+    return payload
 
 
 def save_reminder_state(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("reminder_state", payload)
     return write_json(_path(state_dir, "reminder_state.json"), payload)
 
 
 def load_notification_state(state_dir: Path) -> dict:
-    return read_json(
-        _path(state_dir, "notification_state.json"),
-        {
-            "suppress_reminders": False,
-            "generation_complete_notified": False,
-            "generation_running": False,
-        },
-    )
+    default = {
+        "suppress_reminders": False,
+        "generation_complete_notified": False,
+        "generation_running": False,
+    }
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("notification_state", default)
+    if payload != default:
+        return payload
+    payload = read_json(_path(state_dir, "notification_state.json"), default)
+    if payload != default:
+        store.save_named_json("notification_state", payload)
+    return payload
 
 
 def save_notification_state(state_dir: Path, payload: dict) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("notification_state", payload)
     return write_json(_path(state_dir, "notification_state.json"), payload)
 
 
 def load_mock_exams(state_dir: Path) -> list[dict]:
-    return read_json(_path(state_dir, "mock_exams.json"), [])
+    store = get_study_store(state_dir)
+    payload = store.load_mapping("mock_exams", "mock_exam_id")
+    if payload:
+        return list(payload.values())
+    payload = read_json(_path(state_dir, "mock_exams.json"), [])
+    if payload:
+        store.save_mapping(
+            "mock_exams",
+            "mock_exam_id",
+            {item["id"]: item for item in payload},
+        )
+    return payload
 
 
 def save_mock_exams(state_dir: Path, payload: list[dict]) -> Path:
+    store = get_study_store(state_dir)
+    store.save_mapping(
+        "mock_exams", "mock_exam_id", {item["id"]: item for item in payload}
+    )
     return write_json(_path(state_dir, "mock_exams.json"), payload)
 
 

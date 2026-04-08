@@ -5,12 +5,18 @@ from datetime import datetime
 from pathlib import Path
 
 from study_app.models import Topic, TopicProgress
+from study_app.study_sqlite import get_study_store
 
 
 def load_progress(state_dir: Path, topics: list[Topic]) -> dict[str, TopicProgress]:
     state_dir.mkdir(parents=True, exist_ok=True)
     path = state_dir / "progress.json"
-    raw = json.loads(path.read_text()) if path.exists() else {}
+    store = get_study_store(state_dir)
+    raw = store.load_mapping("progress", "topic_id")
+    if not raw:
+        raw = json.loads(path.read_text()) if path.exists() else {}
+        if raw:
+            store.save_mapping("progress", "topic_id", raw)
     progress: dict[str, TopicProgress] = {}
     for topic in topics:
         item = raw.get(topic.id, {})
@@ -40,5 +46,7 @@ def save_progress(state_dir: Path, progress: dict[str, TopicProgress]) -> Path:
         }
         for key, value in progress.items()
     }
+    store = get_study_store(state_dir)
+    store.save_mapping("progress", "topic_id", serialized)
     path.write_text(json.dumps(serialized, indent=2) + "\n", encoding="utf-8")
     return path
