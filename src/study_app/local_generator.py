@@ -342,6 +342,16 @@ def _build_facts(topic: Topic) -> list[dict]:
         if len(cleaned) < 8:
             continue
 
+        if re.match(r"^[A-Da-d]\.\s+", cleaned):
+            continue
+        if re.fullmatch(r"[A-Da-d]\.?,?", cleaned) is not None:
+            continue
+        if re.fullmatch(r"[IVXLC]+\.?", cleaned):
+            continue
+
+        if re.match(r"^[A-Da-d]\.\s*$", cleaned):
+            continue
+
         if _is_heading_noise(cleaned):
             continue
 
@@ -746,9 +756,13 @@ def _should_attach_to_previous(line: str, previous: str) -> bool:
 
 def _is_heading_noise(text: str) -> bool:
     upper = text.upper().strip(" .")
+    if upper in {"A", "B", "C", "D", "I", "II", "III", "IV", "V"}:
+        return True
     if re.match(r"^BLOQUE\s+\d+", upper):
         return True
     if re.match(r"^TEMA\s+[0-9\sYALDEL.]+$", upper):
+        return True
+    if re.match(r"^(T[IÍ]TULO|CAP[IÍ]TULO|SECCI[ÓO]N|SUBSECCI[ÓO]N)\b", upper):
         return True
     if upper in {
         "FUERZAS Y CUERPOS",
