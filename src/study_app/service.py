@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import uuid
 import re
@@ -17,6 +17,7 @@ from study_app.state import load_progress, save_progress
 from study_app.study_store import (
     ensure_daily_session,
     load_automation_report,
+    load_attempt_events,
     load_card_reviews,
     load_cards,
     load_daily_sessions,
@@ -118,27 +119,41 @@ def build_dashboard_data(
             topic_rows.append(item)
     topic_rows.sort(key=lambda item: item["score"], reverse=True)
     practical_rows.sort(key=lambda item: item["score"], reverse=True)
+    sessions = load_daily_sessions(root / "data" / "state")
+    yesterday_signals = build_yesterday_signals(
+        plan_date, sessions, load_attempt_events(root / "data" / "state")
+    )
     session_targets = calculate_session_targets(
         plan.days_left,
         plan.phase,
         len(cards),
         len(questions),
         practical_rows,
+        yesterday_signals,
     )
     today_theory_cards = select_cards_for_today(
-        plan, cards, card_reviews, session_targets["cards"]
+        plan, cards, card_reviews, session_targets["cards"], yesterday_signals
     )
     today_theory_questions = select_questions_for_today(
-        plan, questions, question_attempts, session_targets["questions"]
+        plan,
+        questions,
+        question_attempts,
+        session_targets["questions"],
+        yesterday_signals,
     )
     today_practical_cards = select_practical_cards(
-        practical_rows, cards, card_reviews, session_targets["practical_cards"]
+        practical_rows,
+        cards,
+        card_reviews,
+        session_targets["practical_cards"],
+        yesterday_signals,
     )
     today_practical_questions = select_practical_questions(
         practical_rows,
         questions,
         question_attempts,
         session_targets["practical_questions"],
+        yesterday_signals,
     )
     today_cards = today_theory_cards + today_practical_cards
     today_questions = today_theory_questions + today_practical_questions
@@ -174,6 +189,7 @@ def build_dashboard_data(
         "study_queue": build_study_queue(today_cards, today_questions, daily_session),
         "session_targets": session_targets,
         "daily_session": daily_session,
+        "yesterday_signals": yesterday_signals,
         "automation_report": automation_report,
     }
 
@@ -223,6 +239,7 @@ def calculate_session_targets(
     card_pool: int,
     question_pool: int,
     practical_rows: list[dict],
+    yesterday_signals: dict,
 ) -> dict:
     if phase == "build":
         cards_target = 18
@@ -248,6 +265,14 @@ def calculate_session_targets(
     if question_pool and questions_target == 0:
         questions_target = min(6, question_pool)
 
+    if yesterday_signals.get("completion_ratio", 1.0) < 0.6:
+        cards_target = max(8, cards_target - 2)
+        questions_target = min(question_pool, questions_target + 2)
+    if yesterday_signals.get("incorrect_count", 0) >= 3:
+        questions_target = min(question_pool, questions_target + 2)
+    if yesterday_signals.get("low_confidence_count", 0) >= 3:
+        cards_target = min(card_pool, cards_target + 2)
+
     return {
         "cards": cards_target,
         "questions": questions_target,
@@ -257,42 +282,68 @@ def calculate_session_targets(
 
 
 def select_cards_for_today(
-    plan, cards: list[dict], card_reviews: dict, target_count: int
+    plan,
+    cards: list[dict],
+    card_reviews: dict,
+    target_count: int,
+    yesterday_signals: dict,
 ) -> list[dict]:
     topic_ids = {
         item.topic.id
         for item in (plan.review_topics + plan.weak_topics + plan.new_topics)
     }
     selected = [card for card in cards if card["topic_id"] in topic_ids]
-    selected.sort(key=lambda card: _card_sort_key(card, card_reviews))
+    selected.sort(
+        key=lambda card: _card_sort_key(card, card_reviews, yesterday_signals)
+    )
     return selected[:target_count]
 
 
-def _card_sort_key(card: dict, card_reviews: dict) -> tuple[int, str, float]:
+def _card_sort_key(
+    card: dict, card_reviews: dict, yesterday_signals: dict
+) -> tuple[int, int, int, str, float]:
     review = card_reviews.get(card["id"], {})
     next_due = review.get("next_due") or "1970-01-01"
     never_reviewed = 0 if review else -1
     difficulty = -float(review.get("difficulty", 0.5))
-    return (never_reviewed, next_due, difficulty)
+    carryover = (
+        0 if card["id"] in yesterday_signals.get("carryover_cards", set()) else 1
+    )
+    low_conf = (
+        0 if card["id"] in yesterday_signals.get("low_confidence_items", set()) else 1
+    )
+    return (carryover, low_conf, never_reviewed, next_due, difficulty)
 
 
 def select_questions_for_today(
-    plan, questions: list[dict], attempts: dict, target_count: int
+    plan,
+    questions: list[dict],
+    attempts: dict,
+    target_count: int,
+    yesterday_signals: dict,
 ) -> list[dict]:
     topic_ids = {item.topic.id for item in (plan.weak_topics + plan.mixed_quiz_topics)}
     selected = [question for question in questions if question["topic_id"] in topic_ids]
-    selected.sort(key=lambda question: _question_sort_key(question, attempts))
+    selected.sort(
+        key=lambda question: _question_sort_key(question, attempts, yesterday_signals)
+    )
     return selected[:target_count]
 
 
 def select_practical_cards(
-    practical_rows: list[dict], cards: list[dict], card_reviews: dict, target_count: int
+    practical_rows: list[dict],
+    cards: list[dict],
+    card_reviews: dict,
+    target_count: int,
+    yesterday_signals: dict,
 ) -> list[dict]:
     if target_count <= 0:
         return []
     topic_ids = {item["id"] for item in practical_rows[:2]}
     selected = [card for card in cards if card["topic_id"] in topic_ids]
-    selected.sort(key=lambda card: _card_sort_key(card, card_reviews))
+    selected.sort(
+        key=lambda card: _card_sort_key(card, card_reviews, yesterday_signals)
+    )
     return selected[:target_count]
 
 
@@ -301,21 +352,39 @@ def select_practical_questions(
     questions: list[dict],
     attempts: dict,
     target_count: int,
+    yesterday_signals: dict,
 ) -> list[dict]:
     if target_count <= 0:
         return []
     topic_ids = {item["id"] for item in practical_rows[:2]}
     selected = [question for question in questions if question["topic_id"] in topic_ids]
-    selected.sort(key=lambda question: _question_sort_key(question, attempts))
+    selected.sort(
+        key=lambda question: _question_sort_key(question, attempts, yesterday_signals)
+    )
     return selected[:target_count]
 
 
-def _question_sort_key(question: dict, attempts: dict) -> tuple[int, int, str]:
+def _question_sort_key(
+    question: dict, attempts: dict, yesterday_signals: dict
+) -> tuple[int, int, int, int, str]:
     attempt = attempts.get(question["id"], {})
     correct_count = int(attempt.get("correct_count", 0))
     attempt_count = int(attempt.get("attempt_count", 0))
     next_due = attempt.get("next_due") or "1970-01-01"
-    return (correct_count, attempt_count, next_due)
+    carryover = (
+        0
+        if question["id"] in yesterday_signals.get("carryover_questions", set())
+        else 1
+    )
+    incorrect = (
+        0 if question["id"] in yesterday_signals.get("incorrect_items", set()) else 1
+    )
+    low_conf = (
+        0
+        if question["id"] in yesterday_signals.get("low_confidence_items", set())
+        else 1
+    )
+    return (carryover, incorrect, low_conf, correct_count + attempt_count, next_due)
 
 
 def next_card(root: Path | None = None, topic_id: str | None = None):
@@ -400,6 +469,52 @@ def progress_summary(root: Path | None = None) -> dict:
         "questions": data["question_count"],
         "sessions": sessions,
         "automation_report": data["automation_report"],
+    }
+
+
+def build_yesterday_signals(
+    plan_date: date, sessions: dict, attempt_events: list[dict]
+) -> dict:
+    yesterday = (plan_date - timedelta(days=1)).isoformat()
+    session = sessions.get(yesterday, {})
+    target_total = int(session.get("target_cards", 0)) + int(
+        session.get("target_questions", 0)
+    )
+    completed_total = len(session.get("completed_cards", [])) + len(
+        session.get("completed_questions", [])
+    )
+    completion_ratio = completed_total / target_total if target_total else 1.0
+    events = [
+        event
+        for event in attempt_events
+        if str(event.get("answered_at", "")).startswith(yesterday)
+    ]
+    incorrect_items = {
+        event["item_id"] for event in events if not event.get("is_correct", True)
+    }
+    low_confidence_items = {
+        event["item_id"]
+        for event in events
+        if event.get("confidence") == "low"
+        or (event.get("confidence") == "medium" and not event.get("is_correct", True))
+    }
+    carryover_cards = set()
+    carryover_questions = set()
+    for item_id in session.get("completed_cards", []):
+        if item_id in low_confidence_items:
+            carryover_cards.add(item_id)
+    for item_id in session.get("completed_questions", []):
+        if item_id in incorrect_items or item_id in low_confidence_items:
+            carryover_questions.add(item_id)
+    return {
+        "date": yesterday,
+        "completion_ratio": round(completion_ratio, 2),
+        "incorrect_count": len(incorrect_items),
+        "low_confidence_count": len(low_confidence_items),
+        "incorrect_items": incorrect_items,
+        "low_confidence_items": low_confidence_items,
+        "carryover_cards": carryover_cards,
+        "carryover_questions": carryover_questions,
     }
 
 
