@@ -355,6 +355,9 @@ def _build_facts(topic: Topic) -> list[dict]:
         if _is_heading_noise(cleaned):
             continue
 
+        if cleaned.endswith(":"):
+            continue
+
         paired_laws = re.match(
             r"((?:DECRETO|ORDEN|LEY|LO|RD|RDL)\s+[0-9/]+[^.]*?)\s+Y\s+((?:ORDEN|DECRETO|LEY|LO|RD|RDL)\s+[0-9/]+[^.]*?)\.\s*(.+)",
             cleaned,
@@ -463,36 +466,36 @@ def _card_from_fact(topic_title: str, fact: dict) -> dict:
     if kind == "law_pair":
         return {
             "front": f"En el {topic_title}, ¿qué regulan conjuntamente {fact['law']} y {fact['support_law']}?",
-            "back": fact["concept"],
+            "back": _compress_concept(fact["concept"]),
         }
     if kind == "law":
         if fact.get("article"):
             return {
                 "front": f"En el {topic_title}, ¿qué norma se asocia al artículo {fact['article']}?",
-                "back": f"{fact['law']}. {fact['concept']}.",
+                "back": f"{fact['law']}. {_compress_concept(fact['concept'])}.",
             }
         return {
             "front": f"En el {topic_title}, ¿qué regula la norma {fact['law']}?",
-            "back": fact["concept"],
+            "back": _compress_concept(fact["concept"]),
         }
     if kind == "article_title":
         return {
             "front": f"¿Qué regula el artículo {fact['article']} en el {topic_title}?",
-            "back": fact["concept"],
+            "back": _compress_concept(fact["concept"]),
         }
     if kind == "enumeration":
         return {
             "front": f"¿Qué dato clave corresponde al punto {fact['label']} del {topic_title}?",
-            "back": fact["concept"],
+            "back": _compress_concept(fact["concept"]),
         }
     if kind == "headline_fact":
         return {
             "front": f"En el {topic_title}, ¿qué establece el apartado '{fact['headline']}'?",
-            "back": fact["concept"],
+            "back": _compress_concept(fact["concept"]),
         }
     return {
         "front": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
-        "back": fact["text"],
+        "back": _compress_concept(fact["text"]),
     }
 
 
@@ -524,7 +527,7 @@ def _quiz_from_fact(topic_title: str, fact: dict, pools: dict) -> dict:
 
 
 def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = fact["concept"]
+    correct = _compress_concept(fact["concept"])
     wrongs = []
     for kind in ("law_pair", "law", "headline_fact", "generic"):
         for candidate in pools.get(kind, []):
@@ -556,7 +559,7 @@ def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
 
 
 def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = fact["concept"]
+    correct = _compress_concept(fact["concept"])
     wrongs = []
     for kind in ("law", "law_pair", "headline_fact", "generic"):
         for candidate in pools.get(kind, []):
@@ -593,7 +596,7 @@ def _quiz_from_law(topic_title: str, fact: dict, pools: dict) -> dict:
 
 
 def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = fact["concept"]
+    correct = _compress_concept(fact["concept"])
     wrongs = []
     for candidate in pools.get("article_title", []):
         text = candidate["concept"]
@@ -620,7 +623,7 @@ def _quiz_from_article_title(topic_title: str, fact: dict, pools: dict) -> dict:
 
 
 def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = fact["concept"]
+    correct = _compress_concept(fact["concept"])
     wrongs = []
     for candidate in pools.get("enumeration", []):
         text = candidate["concept"]
@@ -647,7 +650,7 @@ def _quiz_from_enumeration(topic_title: str, fact: dict, pools: dict) -> dict:
 
 
 def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
-    correct = _short_answer_text(fact["text"])
+    correct = _compress_concept(fact["text"])
     wrongs = []
     for kind in (
         "headline_fact",
@@ -703,6 +706,19 @@ def _short_answer_text(text: str) -> str:
     if len(value) > 140:
         value = value[:137].rstrip() + "..."
     return value
+
+
+def _compress_concept(text: str) -> str:
+    value = _short_answer_text(text)
+    value = re.sub(r"\b[0-9]+\.\s+.*$", "", value).strip()
+    value = re.sub(r"\b[A-D]\.[^\n]*$", "", value).strip()
+    if value.endswith(":"):
+        value = value[:-1].strip()
+    sentences = re.split(r"(?<=[\.!?])\s+", value)
+    value = sentences[0].strip() if sentences else value
+    if len(value) > 110:
+        value = value[:107].rstrip() + "..."
+    return value or _short_answer_text(text)
 
 
 def _generic_focus(text: str) -> str:
