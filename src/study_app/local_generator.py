@@ -209,7 +209,8 @@ def _fallback_cards(topic: Topic, target: int) -> dict:
     cards = []
     for fact in _repeat_to_target(facts, target):
         cards.append(_card_from_fact(topic.title, fact))
-    return {"title": topic.title, "cards": cards}
+    cards = _dedupe_cards(cards)
+    return {"title": topic.title, "cards": cards[:target]}
 
 
 def _fallback_quiz(topic: Topic, target: int) -> dict:
@@ -220,7 +221,8 @@ def _fallback_quiz(topic: Topic, target: int) -> dict:
     questions = []
     for fact in _repeat_to_target(facts, target):
         questions.append(_quiz_from_fact(topic.title, fact, pools))
-    return {"title": topic.title, "questions": questions}
+    questions = _dedupe_questions(questions)
+    return {"title": topic.title, "questions": questions[:target]}
 
 
 def _generate_practical_cards(topic: Topic, target: int) -> dict:
@@ -435,7 +437,9 @@ def _build_facts(topic: Topic) -> list[dict]:
             )
             continue
 
-        split_match = re.match(r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+)\.\s+(.+)", cleaned)
+        split_match = re.match(
+            r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{2,40})\.\s+(.+)", cleaned
+        )
         if split_match and len(split_match.group(1).split()) <= 8:
             facts.append(
                 {
@@ -447,7 +451,11 @@ def _build_facts(topic: Topic) -> list[dict]:
             )
             continue
 
-        if len(cleaned) >= 20 and _is_memorizable_generic(cleaned):
+        if (
+            len(cleaned) >= 20
+            and _is_memorizable_generic(cleaned)
+            and not _looks_like_fragment(cleaned)
+        ):
             facts.append({"kind": "generic", "text": cleaned})
 
     dedup = []
@@ -494,7 +502,7 @@ def _card_from_fact(topic_title: str, fact: dict) -> dict:
             "back": _compress_concept(fact["concept"]),
         }
     return {
-        "front": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
+        "front": _generic_question_from_text(topic_title, fact["text"]),
         "back": _compress_concept(fact["text"]),
     }
 
@@ -673,7 +681,7 @@ def _quiz_from_generic(topic_title: str, fact: dict, pools: dict) -> dict:
     while len(wrongs) < 3:
         wrongs.append(f"Contenido no ajustado al {topic_title}")
     return {
-        "question": f"En el {topic_title}, ¿qué establece el temario sobre '{_generic_focus(fact['text'])}'?",
+        "question": _generic_question_from_text(topic_title, fact["text"]),
         "hint": fact["text"],
         "explanation": f"La formulación correcta reproduce la idea central del temario sobre '{_generic_focus(fact['text'])}'.",
         "answerOptions": [
@@ -725,6 +733,8 @@ def _is_memorizable_generic(text: str) -> bool:
     lower = text.lower()
     if len(text.split()) < 6:
         return False
+    if len(text.split()) > 26:
+        return False
     if lower.endswith(
         (
             "en especial",
@@ -733,33 +743,154 @@ def _is_memorizable_generic(text: str) -> bool:
             "hostelería",
             "objeto",
             "exclusiones",
+            "o similares",
+            "etc",
         )
     ):
         return False
-    signal_terms = [
-        "es ",
-        "son ",
+    if re.search(r"\b[a-d]\.$", lower):
+        return False
+    allowed_starts = (
+        "se ",
         "será ",
         "serán ",
         "debe ",
         "deben ",
-        "podrá ",
-        "podrán ",
         "deberá ",
         "deberán ",
-        "corresponde",
-        "comprende",
-        "incluye",
-        "consiste",
-        "realiza",
-        "resolverá",
-        "velará",
-        "permitirá",
-        "prohíbe",
-        "prohibe",
-        "será ",
+        "podrá ",
+        "podrán ",
+        "corresponde ",
+        "comprende ",
+        "incluye ",
+        "consiste ",
+        "realiza ",
+        "resolverá ",
+        "velará ",
+        "permitirá ",
+        "prohíbe ",
+        "prohibe ",
+        "todos ",
+        "todas ",
+        "el ",
+        "la ",
+        "los ",
+        "las ",
+    )
+    if not lower.startswith(allowed_starts):
+        return False
+    signal_terms = [
+        " es ",
+        " son ",
+        " será ",
+        " serán ",
+        " debe ",
+        " deben ",
+        " podrá ",
+        " podrán ",
+        " deberá ",
+        " deberán ",
+        " corresponde ",
+        " comprende ",
+        " incluye ",
+        " consiste ",
+        " realiza ",
+        " resolverá ",
+        " velará ",
+        " permitirá ",
+        " prohíbe ",
+        " prohibe ",
+        " derecho ",
+        " obligación ",
+        " competencia ",
+        " función ",
+        " principio ",
     ]
-    return any(term in lower for term in signal_terms)
+    return any(term in f" {lower} " for term in signal_terms)
+
+
+def _looks_like_fragment(text: str) -> bool:
+    lower = text.lower().strip()
+    if lower.endswith(
+        (
+            "de",
+            "del",
+            "la",
+            "las",
+            "los",
+            "y",
+            "o",
+            "u",
+            "que",
+            "como",
+            "para",
+            "por",
+            "con",
+            "sin",
+            "según",
+            "segun",
+        )
+    ):
+        return True
+    if lower.startswith(("a. ", "b. ", "c. ", "d. ")):
+        return True
+    if text.count(":") >= 1 and len(text.split()) < 10:
+        return True
+    return False
+
+
+def _generic_question_from_text(topic_title: str, text: str) -> str:
+    lower = text.lower()
+    focus = _generic_focus(text)
+    if (
+        lower.startswith("el nº")
+        or lower.startswith("el n.º")
+        or lower.startswith("el número")
+    ):
+        return f"En el {topic_title}, ¿quién asigna o determina '{focus}'?"
+    if lower.startswith("los medios técnicos"):
+        return f"En el {topic_title}, ¿cómo deben ser los medios técnicos de la Policía Local?"
+    if lower.startswith("la autoridad") or lower.startswith("el funcionario"):
+        return (
+            f"En el {topic_title}, ¿qué conducta tipifica el temario en este supuesto?"
+        )
+    if lower.startswith("el que") or lower.startswith("los que"):
+        return f"En el {topic_title}, ¿qué conducta describe el temario?"
+    if lower.startswith(("el ", "la ", "los ", "las ")) and any(
+        token in lower
+        for token in (
+            " derecho ",
+            " obligación ",
+            " competencia ",
+            " función ",
+            " principio ",
+        )
+    ):
+        return f"En el {topic_title}, ¿qué previsión recoge el temario sobre '{focus}'?"
+    if lower.startswith("se proh"):
+        return f"En el {topic_title}, ¿qué se prohíbe expresamente?"
+    if (
+        lower.startswith("se permite")
+        or lower.startswith("podrá")
+        or lower.startswith("podrán")
+    ):
+        return f"En el {topic_title}, ¿qué actuación o situación se permite?"
+    if (
+        lower.startswith("deberá")
+        or lower.startswith("deberán")
+        or lower.startswith("debe")
+        or lower.startswith("deben")
+    ):
+        return f"En el {topic_title}, ¿qué obligación establece el temario?"
+    if lower.startswith("corresponde"):
+        return f"En el {topic_title}, ¿qué competencia o función corresponde?"
+    if lower.startswith("velará"):
+        return f"En el {topic_title}, ¿sobre qué debe velarse según el temario?"
+    if lower.startswith("la resp") or lower.startswith("la responsabilidad"):
+        return (
+            f"En el {topic_title}, ¿qué comprende la responsabilidad correspondiente?"
+        )
+    return f"En el {topic_title}, ¿qué establece el temario sobre '{focus}'?"
 
 
 def _generic_focus(text: str) -> str:
@@ -780,6 +911,30 @@ def _build_option_explanations(
             f"'{wrong}' no corresponde a esta pregunta; pertenece a otro apartado o a otra norma del mismo bloque."
         )
     return explanations
+
+
+def _dedupe_cards(cards: list[dict]) -> list[dict]:
+    out = []
+    seen = set()
+    for item in cards:
+        key = (item["front"], item["back"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _dedupe_questions(questions: list[dict]) -> list[dict]:
+    out = []
+    seen = set()
+    for item in questions:
+        key = item["question"]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
 
 
 def _normalize_theory_lines(body: str) -> list[str]:
