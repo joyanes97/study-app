@@ -15,18 +15,36 @@ def _path(state_dir: Path, name: str) -> Path:
 
 
 def load_cards(state_dir: Path) -> list[dict]:
-    return read_json(_path(state_dir, "cards.json"), [])
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("cards", [])
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "cards.json"), [])
+    if payload:
+        store.save_named_json("cards", payload)
+    return payload
 
 
 def save_cards(state_dir: Path, cards: list[dict]) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("cards", cards)
     return write_json(_path(state_dir, "cards.json"), cards)
 
 
 def load_questions(state_dir: Path) -> list[dict]:
-    return read_json(_path(state_dir, "questions.json"), [])
+    store = get_study_store(state_dir)
+    payload = store.load_named_json("questions", [])
+    if payload:
+        return payload
+    payload = read_json(_path(state_dir, "questions.json"), [])
+    if payload:
+        store.save_named_json("questions", payload)
+    return payload
 
 
 def save_questions(state_dir: Path, questions: list[dict]) -> Path:
+    store = get_study_store(state_dir)
+    store.save_named_json("questions", questions)
     return write_json(_path(state_dir, "questions.json"), questions)
 
 

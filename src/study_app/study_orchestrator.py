@@ -9,7 +9,13 @@ from study_app.automation import run_automation
 from study_app.service import (
     build_dashboard_data,
     build_mock_exam_data,
+    find_topic,
+    next_card,
+    next_question,
+    next_session_item,
+    progress_summary,
     score_mock_exam,
+    update_exam_date,
 )
 
 
@@ -22,6 +28,24 @@ class StudyOrchestrator:
 
     def dashboard(self, plan_date: date | None = None) -> dict[str, Any]:
         return build_dashboard_data(self.root, plan_date or date.today())
+
+    def topic_detail(self, topic_id: str) -> dict[str, Any] | None:
+        return find_topic(topic_id, self.root)
+
+    def study_card(self, topic_id: str | None = None) -> dict[str, Any] | None:
+        return next_card(self.root, topic_id)
+
+    def study_question(self, topic_id: str | None = None) -> dict[str, Any] | None:
+        return next_question(self.root, topic_id)
+
+    def study_session_item(self) -> dict[str, Any] | None:
+        return next_session_item(self.root)
+
+    def progress(self) -> dict[str, Any]:
+        return progress_summary(self.root)
+
+    def set_exam_date(self, exam_date: date) -> Path:
+        return update_exam_date(self.root, exam_date)
 
     def mock_exam(self) -> dict[str, Any]:
         return build_mock_exam_data(self.root)

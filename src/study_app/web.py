@@ -9,25 +9,15 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from study_app.service import (
-    build_dashboard_data,
-    build_mock_exam_data,
-    find_topic,
-    get_root,
-    mark_session_item_complete,
-    next_card,
-    next_question,
-    next_session_item,
-    progress_summary,
-    score_mock_exam,
-    update_exam_date,
-)
+from study_app.service import get_root, mark_session_item_complete
+from study_app.study_orchestrator import get_study_orchestrator
 from study_app.study_store import (
     record_card_review_event,
     record_question_attempt_event,
 )
 
 ROOT = get_root()
+ORCHESTRATOR = get_study_orchestrator(ROOT)
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 app = FastAPI(title="Exam Study App")
@@ -41,7 +31,7 @@ app.mount(
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, day: str | None = Query(default=None)):
     plan_date = date.fromisoformat(day) if day else date.today()
-    data = build_dashboard_data(ROOT, plan_date)
+    data = ORCHESTRATOR.dashboard(plan_date)
     return TEMPLATES.TemplateResponse(
         request,
         "dashboard.html",
@@ -56,13 +46,13 @@ def dashboard(request: Request, day: str | None = Query(default=None)):
 @app.post("/settings/exam-date")
 def set_exam_date(exam_date: str = Form(...)):
     new_date = date.fromisoformat(exam_date)
-    update_exam_date(ROOT, new_date)
+    ORCHESTRATOR.set_exam_date(new_date)
     return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/topics", response_class=HTMLResponse)
 def topics(request: Request):
-    data = build_dashboard_data(ROOT, date.today())
+    data = ORCHESTRATOR.dashboard(date.today())
     return TEMPLATES.TemplateResponse(
         request,
         "topics.html",
@@ -76,7 +66,7 @@ def topics(request: Request):
 
 @app.get("/topics/{topic_id}", response_class=HTMLResponse)
 def topic_detail(topic_id: str, request: Request):
-    payload = find_topic(topic_id, ROOT)
+    payload = ORCHESTRATOR.topic_detail(topic_id)
     if not payload:
         raise HTTPException(status_code=404, detail="Topic not found")
     topic = payload["topic"]
@@ -100,7 +90,7 @@ def topic_detail(topic_id: str, request: Request):
 
 @app.get("/practicals", response_class=HTMLResponse)
 def practicals(request: Request):
-    data = build_dashboard_data(ROOT, date.today())
+    data = ORCHESTRATOR.dashboard(date.today())
     return TEMPLATES.TemplateResponse(
         request,
         "practicals.html",
@@ -114,8 +104,8 @@ def practicals(request: Request):
 
 @app.get("/study/session", response_class=HTMLResponse)
 def study_session(request: Request):
-    data = build_dashboard_data(ROOT, date.today())
-    current_item = next_session_item(ROOT)
+    data = ORCHESTRATOR.dashboard(date.today())
+    current_item = ORCHESTRATOR.study_session_item()
     return TEMPLATES.TemplateResponse(
         request,
         "session.html",
@@ -137,7 +127,7 @@ def mock_exam(request: Request):
         {
             "request": request,
             "page_title": "Simulacro",
-            "data": build_mock_exam_data(ROOT),
+            "data": ORCHESTRATOR.mock_exam(),
             "result": None,
         },
     )
@@ -150,14 +140,14 @@ async def submit_mock_exam(request: Request):
         key[7:]: value for key, value in form.items() if key.startswith("answer_")
     }
     practical_text = str(form.get("practical_text", ""))
-    result = score_mock_exam(ROOT, answers, practical_text)
+    result = ORCHESTRATOR.score_exam(answers, practical_text)
     return TEMPLATES.TemplateResponse(
         request,
         "mock_exam.html",
         {
             "request": request,
             "page_title": "Simulacro",
-            "data": build_mock_exam_data(ROOT),
+            "data": ORCHESTRATOR.mock_exam(),
             "result": result,
         },
     )
@@ -165,8 +155,8 @@ async def submit_mock_exam(request: Request):
 
 @app.get("/study/cards", response_class=HTMLResponse)
 def study_cards(request: Request, topic: str | None = Query(default=None)):
-    card = next_card(ROOT, topic)
-    data = build_dashboard_data(ROOT, date.today())
+    card = ORCHESTRATOR.study_card(topic)
+    data = ORCHESTRATOR.dashboard(date.today())
     return TEMPLATES.TemplateResponse(
         request,
         "cards.html",
@@ -226,10 +216,10 @@ def study_quiz(
     topic: str | None = Query(default=None),
     answered: str | None = None,
 ):
-    question = next_question(ROOT, topic)
+    question = ORCHESTRATOR.study_question(topic)
     feedback = None
     if answered:
-        payload = build_dashboard_data(ROOT, date.today())
+        payload = ORCHESTRATOR.dashboard(date.today())
         for item in payload["today_questions"]:
             if item["id"] == answered:
                 feedback = item
@@ -242,7 +232,7 @@ def study_quiz(
             "page_title": "Test",
             "question": question,
             "feedback": feedback,
-            "data": build_dashboard_data(ROOT, date.today()),
+            "data": ORCHESTRATOR.dashboard(date.today()),
             "shown_at": datetime.now().isoformat(),
         },
     )
@@ -256,7 +246,7 @@ def answer_quiz(
     confidence: str = Form(...),
     shown_at: str = Form(""),
 ):
-    data = build_dashboard_data(ROOT, date.today())
+    data = ORCHESTRATOR.dashboard(date.today())
     selected_question = None
     for question in data["today_questions"]:
         if question["id"] == question_id:
@@ -287,7 +277,7 @@ def answer_quiz(
         {
             "request": request,
             "page_title": "Test",
-            "question": next_question(ROOT, None),
+            "question": ORCHESTRATOR.study_question(None),
             "feedback": {
                 "question": selected_question,
                 "selected_option": option_id,
@@ -295,7 +285,7 @@ def answer_quiz(
                 "is_correct": is_correct,
                 "confidence": confidence,
             },
-            "data": build_dashboard_data(ROOT, date.today()),
+            "data": ORCHESTRATOR.dashboard(date.today()),
             "shown_at": datetime.now().isoformat(),
         },
     )
@@ -309,7 +299,7 @@ def answer_quiz_from_session(
     confidence: str = Form(...),
     shown_at: str = Form(""),
 ):
-    data = build_dashboard_data(ROOT, date.today())
+    data = ORCHESTRATOR.dashboard(date.today())
     selected_question = None
     for question in data["today_questions"]:
         if question["id"] == question_id:
@@ -340,8 +330,8 @@ def answer_quiz_from_session(
         {
             "request": request,
             "page_title": "Sesión diaria",
-            "data": build_dashboard_data(ROOT, date.today()),
-            "current_item": next_session_item(ROOT),
+            "data": ORCHESTRATOR.dashboard(date.today()),
+            "current_item": ORCHESTRATOR.study_session_item(),
             "shown_at": datetime.now().isoformat(),
             "feedback": {
                 "question": selected_question,
@@ -362,7 +352,7 @@ def progress(request: Request):
         {
             "request": request,
             "page_title": "Progreso",
-            "data": progress_summary(ROOT),
+            "data": ORCHESTRATOR.progress(),
         },
     )
 
@@ -370,15 +360,15 @@ def progress(request: Request):
 @app.get("/api/plan")
 def api_plan(day: str | None = Query(default=None)):
     plan_date = date.fromisoformat(day) if day else date.today()
-    return build_dashboard_data(ROOT, plan_date)
+    return ORCHESTRATOR.dashboard(plan_date)
 
 
 @app.get("/api/topics")
 def api_topics():
-    data = build_dashboard_data(ROOT, date.today())
+    data = ORCHESTRATOR.dashboard(date.today())
     return {"topics": data["topics"], "topic_count": data["topic_count"]}
 
 
 @app.get("/api/automation")
 def api_automation():
-    return progress_summary(ROOT)["automation_report"]
+    return ORCHESTRATOR.progress()["automation_report"]
