@@ -9,6 +9,7 @@ from pathlib import Path
 
 import httpx
 
+from study_app.content_document_validator import DocumentValidator
 from study_app.settings import Settings
 from study_app.study_store import load_pdf_ingest_index, save_pdf_ingest_index
 
@@ -31,6 +32,26 @@ def ingest_pdf_inbox(root: Path, settings: Settings, state_dir: Path) -> dict:
 
     for pdf_path in sorted(media_dir.glob("*.pdf")):
         if pdf_path.name.startswith("._"):
+            continue
+        try:
+            DocumentValidator.validate_file(pdf_path)
+        except ValueError as exc:
+            index[str(pdf_path)] = {
+                "hash": None,
+                "mtime": pdf_path.stat().st_mtime,
+                "status": "invalid",
+                "mode": "validation_failed",
+                "markdown_path": "",
+                "source_pdf": str(pdf_path),
+                "error": str(exc),
+            }
+            pending_ocr.append(
+                {
+                    "source_pdf": str(pdf_path),
+                    "title": pdf_path.stem,
+                    "error": str(exc),
+                }
+            )
             continue
         file_hash = sha1_file(pdf_path)
         previous = index.get(str(pdf_path))
