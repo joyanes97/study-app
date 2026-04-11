@@ -25,6 +25,7 @@ from study_app.service import build_dashboard_data, progress_summary
 from study_app.settings import load_settings
 from study_app.source_normalizer import ensure_normalized_source
 from study_app.state import load_progress
+from study_app.study_sqlite import get_study_db_path
 from study_app.topic_splitter import split_block_markdown
 
 
@@ -208,6 +209,15 @@ def cmd_normalize_sources(root: Path) -> int:
     return 0
 
 
+def cmd_sqlite_status(root: Path) -> int:
+    db_path = get_study_db_path(root / "data" / "state")
+    print(f"sqlite_db: {db_path}")
+    print(f"exists: {db_path.exists()}")
+    if db_path.exists():
+        print(f"size_bytes: {db_path.stat().st_size}")
+    return 0
+
+
 def cmd_serve(host: str, port: int) -> int:
     import uvicorn
 
@@ -243,6 +253,7 @@ def main() -> int:
     subparsers.add_parser("ingest-pdf")
     subparsers.add_parser("normalize-sources")
     subparsers.add_parser("split-topics")
+    subparsers.add_parser("sqlite-status")
     practicals_parser = subparsers.add_parser("generate-practicals")
     practicals_parser.add_argument("--source-pdf", required=True)
 
@@ -279,6 +290,8 @@ def main() -> int:
         return cmd_ingest_pdf(root)
     if args.command == "normalize-sources":
         return cmd_normalize_sources(root)
+    if args.command == "sqlite-status":
+        return cmd_sqlite_status(root)
     if args.command == "split-topics":
         return cmd_split_topics(root)
     if args.command == "generate-practicals":
