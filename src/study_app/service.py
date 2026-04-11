@@ -272,6 +272,9 @@ def calculate_session_targets(
         questions_target = min(question_pool, questions_target + 2)
     if yesterday_signals.get("low_confidence_count", 0) >= 3:
         cards_target = min(card_pool, cards_target + 2)
+    if yesterday_signals.get("due_debt_count", 0) >= 6:
+        cards_target = min(card_pool, cards_target + 2)
+        questions_target = min(question_pool, questions_target + 2)
 
     return {
         "cards": cards_target,
@@ -301,18 +304,20 @@ def select_cards_for_today(
 
 def _card_sort_key(
     card: dict, card_reviews: dict, yesterday_signals: dict
-) -> tuple[int, int, int, str, float]:
+) -> tuple[int, int, int, int, str, float]:
     review = card_reviews.get(card["id"], {})
     next_due = review.get("next_due") or "1970-01-01"
     never_reviewed = 0 if review else -1
     difficulty = -float(review.get("difficulty", 0.5))
+    lapses = -int(review.get("lapse_count", 0))
+    overdue = -_days_overdue(next_due)
     carryover = (
         0 if card["id"] in yesterday_signals.get("carryover_cards", set()) else 1
     )
     low_conf = (
         0 if card["id"] in yesterday_signals.get("low_confidence_items", set()) else 1
     )
-    return (carryover, low_conf, never_reviewed, next_due, difficulty)
+    return (carryover, low_conf, overdue, never_reviewed, lapses, next_due, difficulty)
 
 
 def select_questions_for_today(
@@ -366,11 +371,16 @@ def select_practical_questions(
 
 def _question_sort_key(
     question: dict, attempts: dict, yesterday_signals: dict
-) -> tuple[int, int, int, int, str]:
+) -> tuple[int, int, int, int, int, float, str]:
     attempt = attempts.get(question["id"], {})
     correct_count = int(attempt.get("correct_count", 0))
     attempt_count = int(attempt.get("attempt_count", 0))
     next_due = attempt.get("next_due") or "1970-01-01"
+    overdue = -_days_overdue(next_due)
+    lapses = -(attempt_count - correct_count)
+    confidence_penalty = {"low": 0.2, "medium": 0.1, "high": 0.0}.get(
+        attempt.get("last_confidence"), 0.1
+    )
     carryover = (
         0
         if question["id"] in yesterday_signals.get("carryover_questions", set())
@@ -384,7 +394,8 @@ def _question_sort_key(
         if question["id"] in yesterday_signals.get("low_confidence_items", set())
         else 1
     )
-    return (carryover, incorrect, low_conf, correct_count + attempt_count, next_due)
+    quality = (correct_count / max(attempt_count, 1)) - confidence_penalty
+    return (carryover, incorrect, low_conf, overdue, lapses, quality, next_due)
 
 
 def next_card(root: Path | None = None, topic_id: str | None = None):
@@ -498,6 +509,7 @@ def build_yesterday_signals(
         if event.get("confidence") == "low"
         or (event.get("confidence") == "medium" and not event.get("is_correct", True))
     }
+    due_debt_count = max(0, target_total - completed_total)
     carryover_cards = set()
     carryover_questions = set()
     for item_id in session.get("completed_cards", []):
@@ -511,11 +523,20 @@ def build_yesterday_signals(
         "completion_ratio": round(completion_ratio, 2),
         "incorrect_count": len(incorrect_items),
         "low_confidence_count": len(low_confidence_items),
+        "due_debt_count": due_debt_count,
         "incorrect_items": incorrect_items,
         "low_confidence_items": low_confidence_items,
         "carryover_cards": carryover_cards,
         "carryover_questions": carryover_questions,
     }
+
+
+def _days_overdue(next_due: str) -> int:
+    try:
+        due = date.fromisoformat(next_due)
+    except Exception:
+        return 0
+    return max((date.today() - due).days, 0)
 
 
 def build_mock_exam_data(root: Path | None = None) -> dict:
