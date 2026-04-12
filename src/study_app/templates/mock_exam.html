@@ -25,6 +25,16 @@
     <li>Aciertos: {{ result.correct }} | Fallos: {{ result.wrong }} | Blancas: {{ result.blank }}</li>
     <li>{{ result.practical_feedback }}</li>
   </ul>
+  {% if result.practical_breakdown %}
+  <div class="mock-rubric">
+    <h3>Desglose de la rúbrica</h3>
+    <ul class="action-list compact-list">
+      {% for item in result.practical_breakdown %}
+      <li>{{ item.criterion }} — {{ item.awarded_points }}/{{ item.max_points }} · {{ item.comment }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
 </article>
 {% endif %}
 

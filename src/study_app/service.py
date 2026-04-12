@@ -602,13 +602,14 @@ def score_mock_exam(
 
     practical_score = 0.0
     practical_feedback = "No evaluado porque la Parte A no alcanzó 5.0."
+    practical_breakdown = []
     practical_case = None
     mock_data = build_mock_exam_data(root)
     if mock_data["practicals"]:
         practical_case = mock_data["practicals"][0]["case"]
     if part_a_passed:
-        practical_score, practical_feedback = evaluate_practical_submission(
-            practical_text, practical_case
+        practical_score, practical_feedback, practical_breakdown = (
+            evaluate_practical_submission(practical_text, practical_case)
         )
 
     final_score = (
@@ -629,6 +630,7 @@ def score_mock_exam(
         "wrong": wrong,
         "blank": blank,
         "practical_feedback": practical_feedback,
+        "practical_breakdown": practical_breakdown,
     }
     state_dir = root / "data" / "state"
     history = load_mock_exams(state_dir)
@@ -639,10 +641,10 @@ def score_mock_exam(
 
 def evaluate_practical_submission(
     practical_text: str, practical_case: dict | None = None
-) -> tuple[float, str]:
+) -> tuple[float, str, list[dict]]:
     text = practical_text.strip()
     if not text:
-        return 0.0, "No se ha entregado desarrollo del supuesto práctico."
+        return 0.0, "No se ha entregado desarrollo del supuesto práctico.", []
 
     lowered = text.lower()
     keywords = [
@@ -672,34 +674,75 @@ def evaluate_practical_submission(
     keyword_score = min(keyword_hits / 5, 1.0)
     case_score = min(case_hits / max(len(case_terms), 1), 1.0) if case_terms else 0.5
     structure_score = 1.0 if ("1." in text or "- " in text or "•" in text) else 0.5
-    score = round(
-        min(
-            10.0,
-            (
-                length_score * 3
-                + keyword_score * 3
-                + case_score * 2
-                + structure_score * 2
+    breakdown = []
+    if rubric:
+        total_points = sum(item["points"] for item in rubric)
+        awarded_total = 0.0
+        for item in rubric:
+            criterion = item["criterion"]
+            criterion_terms = _extract_case_terms(criterion)
+            coverage = any(term in lowered for term in criterion_terms)
+            if "hechos" in criterion.lower():
+                coverage = coverage or case_score > 0.35
+            if "actuación" in criterion.lower():
+                coverage = coverage or (
+                    "actuación" in lowered or "intervención" in lowered
+                )
+            if "diligencias" in criterion.lower():
+                coverage = coverage or (
+                    "diligencia" in lowered
+                    or "acta" in lowered
+                    or "denuncia" in lowered
+                )
+            if (
+                "fundamentación" in criterion.lower()
+                or "resolución" in criterion.lower()
+            ):
+                coverage = coverage or (
+                    "norma" in lowered
+                    or "artículo" in lowered
+                    or "resolución" in lowered
+                )
+            awarded = item["points"] if coverage else round(item["points"] * 0.35, 2)
+            awarded_total += awarded
+            breakdown.append(
+                {
+                    "criterion": criterion,
+                    "max_points": item["points"],
+                    "awarded_points": awarded,
+                    "covered": coverage,
+                    "comment": "Criterio bien cubierto."
+                    if coverage
+                    else "Criterio parcialmente cubierto o insuficiente.",
+                }
+            )
+        score = round((awarded_total / max(total_points, 1)) * 10, 2)
+    else:
+        score = round(
+            min(
+                10.0,
+                (
+                    length_score * 3
+                    + keyword_score * 3
+                    + case_score * 2
+                    + structure_score * 2
+                ),
             ),
-        ),
-        2,
-    )
+            2,
+        )
     feedback = (
         f"Desarrollo con longitud {'adecuada' if length_score > 0.6 else 'mejorable'}, "
         f"cobertura jurídica {'sólida' if keyword_score > 0.6 else 'limitada'}, "
         f"ajuste al caso {'alto' if case_score > 0.6 else 'mejorable'} y "
         f"estructura {'clara' if structure_score > 0.8 else 'mejorable'}."
     )
-    if rubric:
-        rubric_feedback = []
-        for item in rubric:
-            criterion_terms = _extract_case_terms(item["criterion"])
-            covered = any(term in lowered for term in criterion_terms)
-            rubric_feedback.append(
-                f"{item['criterion']}: {'cubierto' if covered else 'débil'}"
-            )
+    if breakdown:
+        rubric_feedback = [
+            f"{item['criterion']}: {'cubierto' if item['covered'] else 'débil'}"
+            for item in breakdown
+        ]
         feedback += " Rúbrica: " + "; ".join(rubric_feedback) + "."
-    return score, feedback
+    return score, feedback, breakdown
 
 
 def _extract_case_terms(text: str) -> list[str]:
