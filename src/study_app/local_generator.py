@@ -378,10 +378,12 @@ def _build_facts(topic: Topic) -> list[dict]:
             continue
 
         article_match = re.search(
-            r"\bART[ÍI]?C?U?L?O?\s*([0-9]+(?:\.[0-9]+)?)", cleaned, flags=re.IGNORECASE
+            r"\bART[ÍI]?C?U?L?O?\.?\s*([0-9]+(?:\.[0-9]+)?)",
+            cleaned,
+            flags=re.IGNORECASE,
         )
         short_article_match = re.search(
-            r"\bART\s*([0-9]+(?:\.[0-9]+)?)", cleaned, flags=re.IGNORECASE
+            r"\bART\.?\s*([0-9]+(?:\.[0-9]+)?)", cleaned, flags=re.IGNORECASE
         )
         article = None
         if article_match:
@@ -410,7 +412,7 @@ def _build_facts(topic: Topic) -> list[dict]:
                 continue
 
         title_match = re.match(
-            r"ART[ÍI]?C?U?L?O?\s*([0-9]+(?:\.[0-9]+)?)\.\s*(.+)",
+            r"ART[ÍI]?C?U?L?O?\.?\s*([0-9]+(?:\.[0-9]+)?)(?:\.|\s)\s*(.+)",
             cleaned,
             flags=re.IGNORECASE,
         )
@@ -440,12 +442,18 @@ def _build_facts(topic: Topic) -> list[dict]:
         split_match = re.match(
             r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{2,40})\.\s+(.+)", cleaned
         )
-        if split_match and len(split_match.group(1).split()) <= 8:
+        concept_candidate = split_match.group(2).strip() if split_match else ""
+        if (
+            split_match
+            and len(split_match.group(1).split()) <= 8
+            and len(concept_candidate) >= 8
+            and not concept_candidate.lower().startswith(("ojo", "¡ojo"))
+        ):
             facts.append(
                 {
                     "kind": "headline_fact",
                     "headline": split_match.group(1).title(),
-                    "concept": split_match.group(2).strip(),
+                    "concept": concept_candidate,
                     "text": cleaned,
                 }
             )
@@ -719,6 +727,7 @@ def _short_answer_text(text: str) -> str:
 def _compress_concept(text: str) -> str:
     value = _short_answer_text(text)
     value = re.sub(r"\b[0-9]+\.\s+.*$", "", value).strip()
+    value = re.sub(r"^[A-D]\.[ ]*", "", value).strip()
     value = re.sub(r"\b[A-D]\.[^\n]*$", "", value).strip()
     if value.endswith(":"):
         value = value[:-1].strip()
@@ -941,6 +950,9 @@ def _normalize_theory_lines(body: str) -> list[str]:
     raw_lines = [line.strip() for line in body.splitlines() if line.strip()]
     merged: list[str] = []
     for line in raw_lines:
+        if merged and _should_merge_heading_with_next(merged[-1], line):
+            merged[-1] = f"{merged[-1].rstrip(':')} . {line.lstrip()}"
+            continue
         if _should_attach_to_previous(line, merged[-1] if merged else ""):
             merged[-1] = f"{merged[-1].rstrip()} {line.lstrip()}"
         else:
@@ -964,6 +976,17 @@ def _should_attach_to_previous(line: str, previous: str) -> bool:
     if previous.endswith((",", ";", ":")):
         return True
     return False
+
+
+def _should_merge_heading_with_next(previous: str, line: str) -> bool:
+    prev = previous.strip()
+    if not prev.endswith(":"):
+        return False
+    if len(prev.split()) > 6:
+        return False
+    if line.startswith(("•", "-", "⎯", "✓", "❖", "➢")):
+        return False
+    return True
 
 
 def _is_heading_noise(text: str) -> bool:
