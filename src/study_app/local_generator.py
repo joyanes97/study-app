@@ -452,7 +452,7 @@ def _build_facts(topic: Topic) -> list[dict]:
             facts.append(
                 {
                     "kind": "headline_fact",
-                    "headline": split_match.group(1).title(),
+                    "headline": _normalize_headline(split_match.group(1)),
                     "concept": concept_candidate,
                     "text": cleaned,
                 }
@@ -505,8 +505,27 @@ def _card_from_fact(topic_title: str, fact: dict) -> dict:
             "back": _compress_concept(fact["concept"]),
         }
     if kind == "headline_fact":
+        headline = fact["headline"]
+        lower_headline = headline.lower()
+        if lower_headline in {
+            "prescripción",
+            "prescripcion",
+            "responsabilidad civil",
+            "responsabilidad civil subsidiaria",
+            "extinción responsabilidad criminal",
+            "prescripción de los delitos",
+            "prescripción de las penas",
+            "cancelación de antecedentes de oficio o instancia parte",
+            "decretos leyes",
+            "proyecto ley",
+            "proposiciones ley",
+        }:
+            return {
+                "front": f"En el {topic_title}, ¿qué establece el apartado '{headline}'?",
+                "back": _compress_concept(fact["concept"]),
+            }
         return {
-            "front": f"En el {topic_title}, ¿qué establece el apartado '{fact['headline']}'?",
+            "front": f"En el {topic_title}, ¿qué establece el apartado '{headline}'?",
             "back": _compress_concept(fact["concept"]),
         }
     return {
@@ -539,7 +558,49 @@ def _quiz_from_fact(topic_title: str, fact: dict, pools: dict) -> dict:
         return _quiz_from_article_title(topic_title, fact, pools)
     if kind == "enumeration":
         return _quiz_from_enumeration(topic_title, fact, pools)
+    if kind == "headline_fact":
+        return _quiz_from_headline(topic_title, fact, pools)
     return _quiz_from_generic(topic_title, fact, pools)
+
+
+def _quiz_from_headline(topic_title: str, fact: dict, pools: dict) -> dict:
+    headline = fact["headline"]
+    correct = _compress_concept(fact["concept"])
+    wrongs = []
+    for kind in (
+        "headline_fact",
+        "generic",
+        "enumeration",
+        "article_title",
+        "law",
+        "law_pair",
+    ):
+        for candidate in pools.get(kind, []):
+            text = _compress_concept(
+                candidate.get("concept") or candidate.get("text", "")
+            )
+            if text and text != correct and text not in wrongs:
+                wrongs.append(text)
+            if len(wrongs) == 3:
+                break
+        if len(wrongs) == 3:
+            break
+    while len(wrongs) < 3:
+        wrongs.append(f"Contenido distinto del apartado '{headline}'.")
+    return {
+        "question": f"En el {topic_title}, ¿qué establece el apartado '{headline}'?",
+        "hint": fact["text"],
+        "explanation": f"El apartado '{headline}' recoge '{correct}'.",
+        "answerOptions": [
+            {"text": correct, "isCorrect": True},
+            {"text": wrongs[0], "isCorrect": False},
+            {"text": wrongs[1], "isCorrect": False},
+            {"text": wrongs[2], "isCorrect": False},
+        ],
+        "optionExplanations": _build_option_explanations(
+            correct, wrongs, f"El apartado '{headline}' se refiere a '{correct}'."
+        ),
+    }
 
 
 def _quiz_from_law_pair(topic_title: str, fact: dict, pools: dict) -> dict:
@@ -726,6 +787,7 @@ def _short_answer_text(text: str) -> str:
 
 def _compress_concept(text: str) -> str:
     value = _short_answer_text(text)
+    value = re.sub(r"^[0-9]+\.\s*", "", value).strip()
     value = re.sub(r"\b[0-9]+\.\s+.*$", "", value).strip()
     value = re.sub(r"^[A-D]\.[ ]*", "", value).strip()
     value = re.sub(r"\b[A-D]\.[^\n]*$", "", value).strip()
@@ -736,6 +798,12 @@ def _compress_concept(text: str) -> str:
     if len(value) > 110:
         value = value[:107].rstrip() + "..."
     return value or _short_answer_text(text)
+
+
+def _normalize_headline(text: str) -> str:
+    value = text.strip().strip(".").strip()
+    value = re.sub(r"\s+", " ", value)
+    return value.title()
 
 
 def _is_memorizable_generic(text: str) -> bool:
@@ -851,6 +919,18 @@ def _looks_like_fragment(text: str) -> bool:
 def _generic_question_from_text(topic_title: str, text: str) -> str:
     lower = text.lower()
     focus = _generic_focus(text)
+    if lower.startswith("los demás vehículos") or lower.startswith(
+        "los demas vehiculos"
+    ):
+        return f"En el {topic_title}, ¿qué distancia de seguridad deben mantener los demás vehículos?"
+    if lower.startswith("la sesión constitutiva") or lower.startswith(
+        "la sesion constitutiva"
+    ):
+        return f"En el {topic_title}, ¿quién convoca la sesión constitutiva y en qué plazo?"
+    if lower.startswith("el espacio schengen"):
+        return f"En el {topic_title}, ¿qué es el Espacio Schengen?"
+    if lower.startswith("el estado o ccaa"):
+        return f"En el {topic_title}, ¿qué puede impugnar directamente el Estado o la CCAA?"
     if (
         lower.startswith("el nº")
         or lower.startswith("el n.º")
